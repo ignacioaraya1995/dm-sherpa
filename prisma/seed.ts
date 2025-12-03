@@ -44,8 +44,10 @@ function generateLastName(): string {
   return randomElement(LAST_NAMES);
 }
 
+let emailCounter = 0;
 function generateEmail(firstName: string, lastName: string): string {
-  return `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`;
+  emailCounter++;
+  return `${firstName.toLowerCase()}.${lastName.toLowerCase()}${emailCounter}@example.com`;
 }
 
 function generatePhone(): string {
@@ -191,7 +193,7 @@ async function main() {
       const member = await prisma.user.create({
         data: {
           accountId: account.id,
-          email: generateEmail(firstName, lastName) + i,
+          email: generateEmail(firstName, lastName),
           name: `${firstName} ${lastName}`,
           role: randomElement(USER_ROLES),
           settings: {},
