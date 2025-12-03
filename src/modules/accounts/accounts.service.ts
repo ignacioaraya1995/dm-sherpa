@@ -13,7 +13,7 @@ export class AccountsService {
       data: {
         name: dto.name,
         type: dto.type,
-        settings: dto.settings || {},
+        settings: (dto.settings || {}) as Prisma.InputJsonValue,
       },
       include: {
         _count: {
@@ -87,7 +87,12 @@ export class AccountsService {
 
     return this.prisma.account.update({
       where: { id },
-      data: dto,
+      data: {
+        name: dto.name,
+        type: dto.type,
+        status: dto.status,
+        settings: dto.settings ? (dto.settings as Prisma.InputJsonValue) : undefined,
+      },
       include: {
         _count: {
           select: { users: true, campaigns: true, deals: true },

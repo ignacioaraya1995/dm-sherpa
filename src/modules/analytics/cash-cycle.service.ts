@@ -55,9 +55,8 @@ export class CashCycleService {
       where: {
         accountId,
         status: DealStatus.CLOSED,
-        closeDate: { gte: since },
+        closeDate: { gte: since, not: null },
         contractDate: { not: null },
-        closeDate: { not: null },
       },
       select: {
         type: true,

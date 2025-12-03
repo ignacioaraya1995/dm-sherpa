@@ -9,6 +9,7 @@ import {
 } from './dto/property.dto';
 import { PaginationDto, PaginatedResponseDto } from '@/common/dto/pagination.dto';
 import { Prisma, PriceBand } from '@prisma/client';
+type JsonValue = Prisma.InputJsonValue;
 
 @Injectable()
 export class PropertiesService {
@@ -132,10 +133,11 @@ export class PropertiesService {
       ? this.calculatePriceBand(dto.avmValue)
       : undefined;
 
+    const { owner, ...updateData } = dto;
     return this.prisma.property.update({
       where: { id },
       data: {
-        ...dto,
+        ...updateData,
         priceBand: priceBand || dto.priceBand,
       },
       include: {
@@ -160,7 +162,7 @@ export class PropertiesService {
         severity: dto.severity,
         startDate: dto.startDate,
         endDate: dto.endDate,
-        metadata: dto.metadata || {},
+        metadata: (dto.metadata || {}) as JsonValue,
         source: dto.source,
       },
     });
