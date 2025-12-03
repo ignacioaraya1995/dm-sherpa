@@ -114,10 +114,10 @@ const distressColors: Record<string, string> = {
   CODE_VIOLATION: 'warning',
   EVICTION: 'warning',
   BANKRUPTCY: 'danger',
-  VACANT: 'info',
-  ABSENTEE: 'default',
+  VACANT: 'cyan',
+  ABSENTEE: 'neutral',
   HIGH_EQUITY: 'success',
-  TIRED_LANDLORD: 'info',
+  TIRED_LANDLORD: 'cyan',
 };
 
 export default function PropertiesPage() {
@@ -146,8 +146,8 @@ export default function PropertiesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Properties</h1>
-          <p className="text-gray-500">
+          <h1 className="text-2xl font-bold text-text-primary">Properties</h1>
+          <p className="text-text-secondary mt-1">
             Browse and manage your property database
           </p>
         </div>
@@ -180,24 +180,24 @@ export default function PropertiesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="glass-card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
             <input
               type="text"
               placeholder="Search by address or city..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field w-full pl-10"
             />
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-400" />
+            <Filter className="w-5 h-5 text-text-muted" />
             <select
               value={distressFilter}
               onChange={(e) => setDistressFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field"
             >
               <option value="all">All Distress Types</option>
               <option value="PRE_FORECLOSURE">Pre-Foreclosure</option>
@@ -217,9 +217,9 @@ export default function PropertiesPage() {
             header: 'Property',
             accessor: (row) => (
               <div>
-                <p className="font-medium text-gray-900">{row.streetAddress}</p>
-                <p className="text-sm text-gray-500 flex items-center">
-                  <MapPin className="h-3 w-3 mr-1" />
+                <p className="font-medium text-text-primary">{row.streetAddress}</p>
+                <p className="text-sm text-text-muted flex items-center">
+                  <MapPin className="w-3 h-3 mr-1" />
                   {row.city}, {row.state} {row.zipCode}
                 </p>
               </div>
@@ -229,8 +229,8 @@ export default function PropertiesPage() {
             header: 'Details',
             accessor: (row) => (
               <div className="text-sm">
-                <p>{row.propertyType.replace('_', ' ')}</p>
-                <p className="text-gray-500">
+                <p className="text-text-primary">{row.propertyType.replace('_', ' ')}</p>
+                <p className="text-text-muted">
                   {row.beds}bd / {row.baths}ba / {row.sqft.toLocaleString()}sf
                 </p>
               </div>
@@ -240,8 +240,8 @@ export default function PropertiesPage() {
             header: 'AVM / ARV',
             accessor: (row) => (
               <div className="text-sm">
-                <p className="font-medium">${row.avmValue.toLocaleString()}</p>
-                <p className="text-gray-500">
+                <p className="font-medium text-text-primary">${row.avmValue.toLocaleString()}</p>
+                <p className="text-text-muted">
                   ARV: ${row.arvValue.toLocaleString()}
                 </p>
               </div>
@@ -253,28 +253,28 @@ export default function PropertiesPage() {
             accessor: (row) => (
               <div className="text-sm space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Motivation:</span>
+                  <span className="text-text-muted">Motivation:</span>
                   <span
                     className={`font-medium ${
                       row.motivationScore >= 0.7
-                        ? 'text-green-600'
+                        ? 'text-success'
                         : row.motivationScore >= 0.5
-                        ? 'text-yellow-600'
-                        : 'text-gray-600'
+                        ? 'text-warning'
+                        : 'text-text-muted'
                     }`}
                   >
                     {(row.motivationScore * 100).toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Dispo:</span>
+                  <span className="text-text-muted">Dispo:</span>
                   <span
                     className={`font-medium ${
                       row.dispoScore >= 0.7
-                        ? 'text-green-600'
+                        ? 'text-success'
                         : row.dispoScore >= 0.5
-                        ? 'text-yellow-600'
-                        : 'text-gray-600'
+                        ? 'text-warning'
+                        : 'text-text-muted'
                     }`}
                   >
                     {(row.dispoScore * 100).toFixed(0)}%
@@ -288,7 +288,7 @@ export default function PropertiesPage() {
             accessor: (row) => (
               <div className="flex flex-wrap gap-1">
                 {row.isVacant && <Badge variant="cyan">Vacant</Badge>}
-                {row.isAbsenteeOwner && <Badge>Absentee</Badge>}
+                {row.isAbsenteeOwner && <Badge variant="neutral">Absentee</Badge>}
               </div>
             ),
           },

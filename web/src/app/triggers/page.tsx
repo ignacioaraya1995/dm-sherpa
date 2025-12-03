@@ -70,13 +70,13 @@ export default function TriggersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Triggers</h1>
-          <p className="text-gray-500">
+          <h1 className="text-2xl font-bold text-text-primary">Triggers</h1>
+          <p className="text-text-secondary mt-1">
             Automate actions based on events and conditions
           </p>
         </div>
-        <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-          <Plus className="h-5 w-5 mr-2" />
+        <button className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
           New Trigger
         </button>
       </div>
@@ -115,15 +115,15 @@ export default function TriggersPage() {
             header: 'Trigger',
             accessor: (row) => (
               <div>
-                <p className="font-medium text-gray-900">{row.name}</p>
-                <p className="text-sm text-gray-500">{row.description}</p>
+                <p className="font-medium text-text-primary">{row.name}</p>
+                <p className="text-sm text-text-muted">{row.description}</p>
               </div>
             ),
           },
           {
             header: 'Type',
             accessor: (row) => (
-              <Badge>{row.triggerType.replace(/_/g, ' ')}</Badge>
+              <Badge variant="neutral">{row.triggerType.replace(/_/g, ' ')}</Badge>
             ),
           },
           {
@@ -136,31 +136,34 @@ export default function TriggersPage() {
             header: 'Status',
             accessor: (row) =>
               row.isActive ? (
-                <span className="inline-flex items-center text-green-600">
-                  <Play className="h-4 w-4 mr-1" />
+                <span className="inline-flex items-center text-success">
+                  <Play className="w-4 h-4 mr-1" />
                   Active
                 </span>
               ) : (
-                <span className="inline-flex items-center text-gray-400">
-                  <Pause className="h-4 w-4 mr-1" />
+                <span className="inline-flex items-center text-text-muted">
+                  <Pause className="w-4 h-4 mr-1" />
                   Paused
                 </span>
               ),
           },
           {
             header: 'Executions',
-            accessor: 'totalTriggered',
+            accessor: (row) => <span className="text-text-primary">{row.totalTriggered}</span>,
             className: 'text-right',
           },
           {
             header: 'Last Triggered',
-            accessor: (row) =>
-              new Date(row.lastTriggered).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
+            accessor: (row) => (
+              <span className="text-text-secondary">
+                {new Date(row.lastTriggered).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            ),
           },
         ]}
         data={mockTriggers}

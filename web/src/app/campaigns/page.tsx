@@ -106,11 +106,11 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
-          <p className="text-gray-500">Manage your direct mail campaigns</p>
+          <h1 className="text-2xl font-bold text-text-primary">Campaigns</h1>
+          <p className="text-text-secondary mt-1">Manage your direct mail campaigns</p>
         </div>
-        <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-          <Plus className="h-5 w-5 mr-2" />
+        <button className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
           New Campaign
         </button>
       </div>
@@ -141,24 +141,24 @@ export default function CampaignsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="glass-card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
             <input
               type="text"
               placeholder="Search campaigns..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field w-full pl-10"
             />
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-400" />
+            <Filter className="w-5 h-5 text-text-muted" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field"
             >
               <option value="all">All Status</option>
               <option value="DRAFT">Draft</option>
@@ -179,11 +179,11 @@ export default function CampaignsPage() {
               <div>
                 <Link
                   href={`/campaigns/${row.id}`}
-                  className="font-medium text-gray-900 hover:text-primary-600"
+                  className="font-medium text-text-primary hover:text-accent transition-colors"
                 >
                   {row.name}
                 </Link>
-                <p className="text-sm text-gray-500">{row.type}</p>
+                <p className="text-sm text-text-muted">{row.type}</p>
               </div>
             ),
           },
@@ -195,12 +195,12 @@ export default function CampaignsPage() {
             header: 'Budget',
             accessor: (row) => (
               <div>
-                <div className="font-medium">
+                <div className="font-medium text-text-primary">
                   ${row.spentBudget.toLocaleString()} / ${row.totalBudget.toLocaleString()}
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                <div className="w-full bg-dark-700 rounded-full h-1.5 mt-1">
                   <div
-                    className="bg-primary-600 h-1.5 rounded-full"
+                    className="bg-accent h-1.5 rounded-full"
                     style={{
                       width: `${(row.spentBudget / row.totalBudget) * 100}%`,
                     }}
@@ -211,36 +211,37 @@ export default function CampaignsPage() {
           },
           {
             header: 'Mailed',
-            accessor: (row) => row.totalMailed.toLocaleString(),
+            accessor: (row) => <span className="text-text-primary">{row.totalMailed.toLocaleString()}</span>,
             className: 'text-right',
           },
           {
             header: 'Calls',
-            accessor: (row) => row.totalCalls.toLocaleString(),
+            accessor: (row) => <span className="text-text-primary">{row.totalCalls.toLocaleString()}</span>,
             className: 'text-right',
           },
           {
             header: 'Contracts',
-            accessor: 'totalContracts',
+            accessor: (row) => <span className="text-text-primary">{row.totalContracts}</span>,
             className: 'text-right',
           },
           {
             header: 'Response',
-            accessor: (row) =>
-              row.responseRate > 0 ? `${(row.responseRate * 100).toFixed(2)}%` : '-',
+            accessor: (row) => (
+              <span className="text-text-primary">
+                {row.responseRate > 0 ? `${(row.responseRate * 100).toFixed(2)}%` : '-'}
+              </span>
+            ),
             className: 'text-right',
           },
           {
             header: 'ROI',
             accessor: (row) =>
               row.roi > 0 ? (
-                <span
-                  className={row.roi >= 2 ? 'text-green-600 font-medium' : 'text-yellow-600'}
-                >
+                <span className={row.roi >= 2 ? 'text-success font-medium' : 'text-warning'}>
                   {row.roi.toFixed(1)}x
                 </span>
               ) : (
-                '-'
+                <span className="text-text-muted">-</span>
               ),
             className: 'text-right',
           },

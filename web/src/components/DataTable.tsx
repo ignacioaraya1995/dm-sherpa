@@ -25,25 +25,25 @@ export function DataTable<T extends { id: string }>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+      <div className="glass-card p-8">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="glass-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-glass-border">
+          <thead className="bg-glass-surface">
             <tr>
               {columns.map((column, i) => (
                 <th
                   key={i}
                   className={clsx(
-                    'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    'px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider',
                     column.className
                   )}
                 >
@@ -52,12 +52,12 @@ export function DataTable<T extends { id: string }>({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-glass-border/50">
             {data.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-6 py-8 text-center text-gray-500"
+                  className="px-6 py-8 text-center text-text-muted"
                 >
                   {emptyMessage}
                 </td>
@@ -69,14 +69,14 @@ export function DataTable<T extends { id: string }>({
                   onClick={() => onRowClick?.(row)}
                   className={clsx(
                     'transition-colors',
-                    onRowClick && 'cursor-pointer hover:bg-gray-50'
+                    onRowClick && 'cursor-pointer hover:bg-glass-surface'
                   )}
                 >
                   {columns.map((column, i) => (
                     <td
                       key={i}
                       className={clsx(
-                        'px-6 py-4 whitespace-nowrap text-sm',
+                        'px-6 py-4 whitespace-nowrap text-sm text-text-secondary',
                         column.className
                       )}
                     >

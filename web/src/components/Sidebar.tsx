@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -23,6 +24,8 @@ import {
   Palette,
   Layers,
   Brush,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -85,6 +88,28 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+    // Initialize all groups as expanded
+    const initial: Record<string, boolean> = {};
+    navigation.forEach((group) => {
+      initial[group.label] = true;
+    });
+    return initial;
+  });
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
+
+  // Check if any item in a group is active
+  const isGroupActive = (items: typeof navigation[0]['items']) => {
+    return items.some((item) =>
+      pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+    );
+  };
 
   return (
     <aside className="w-64 h-screen flex flex-col bg-dark-800/70 backdrop-blur-xl border-r border-glass-border">
@@ -100,36 +125,72 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
-        {navigation.map((group) => (
-          <div key={group.label} className="mb-6">
-            <div className="px-3 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                {group.label}
-              </span>
+        {navigation.map((group) => {
+          const isExpanded = expandedGroups[group.label];
+          const groupActive = isGroupActive(group.items);
+
+          return (
+            <div key={group.label} className="mb-2">
+              {/* Group Header - Clickable */}
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className={clsx(
+                  'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
+                  'hover:bg-glass-surface',
+                  groupActive && 'bg-glass-surface'
+                )}
+              >
+                <span className={clsx(
+                  'text-xs font-semibold uppercase tracking-wider',
+                  groupActive ? 'text-accent' : 'text-text-muted'
+                )}>
+                  {group.label}
+                </span>
+                {isExpanded ? (
+                  <ChevronDown className={clsx(
+                    'w-4 h-4 transition-transform',
+                    groupActive ? 'text-accent' : 'text-text-muted'
+                  )} />
+                ) : (
+                  <ChevronRight className={clsx(
+                    'w-4 h-4 transition-transform',
+                    groupActive ? 'text-accent' : 'text-text-muted'
+                  )} />
+                )}
+              </button>
+
+              {/* Group Items - Collapsible */}
+              <div
+                className={clsx(
+                  'overflow-hidden transition-all duration-200 ease-in-out',
+                  isExpanded ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                )}
+              >
+                <ul className="space-y-1 pl-2">
+                  {group.items.map((item) => {
+                    const isActive = pathname === item.href ||
+                      (item.href !== '/' && pathname.startsWith(item.href + '/'));
+                    const Icon = item.icon;
+                    return (
+                      <li key={item.name}>
+                        <Link
+                          href={item.href}
+                          className={clsx(
+                            'nav-item',
+                            isActive && 'nav-item-active'
+                          )}
+                        >
+                          <Icon className="w-5 h-5" />
+                          <span className="text-sm font-medium">{item.name}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </div>
-            <ul className="space-y-1">
-              {group.items.map((item) => {
-                const isActive = pathname === item.href ||
-                  (item.href !== '/' && pathname.startsWith(item.href + '/'));
-                const Icon = item.icon;
-                return (
-                  <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      className={clsx(
-                        'nav-item',
-                        isActive && 'nav-item-active'
-                      )}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* System Health Footer */}

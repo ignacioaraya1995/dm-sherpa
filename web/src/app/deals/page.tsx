@@ -129,8 +129,8 @@ export default function DealsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Deals</h1>
-          <p className="text-gray-500">Track your deal pipeline and closings</p>
+          <h1 className="text-2xl font-bold text-text-primary">Deals</h1>
+          <p className="text-text-secondary mt-1">Track your deal pipeline and closings</p>
         </div>
       </div>
 
@@ -168,24 +168,24 @@ export default function DealsPage() {
       <PipelineChart data={mockPipeline} />
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="glass-card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
             <input
               type="text"
               placeholder="Search by property..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field w-full pl-10"
             />
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-400" />
+            <Filter className="w-5 h-5 text-text-muted" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="input-field"
             >
               <option value="all">All Status</option>
               <option value="PENDING">Pending</option>
@@ -205,8 +205,8 @@ export default function DealsPage() {
             header: 'Property',
             accessor: (row) => (
               <div>
-                <p className="font-medium text-gray-900">{row.property}</p>
-                <p className="text-sm text-gray-500">{row.campaign}</p>
+                <p className="font-medium text-text-primary">{row.property}</p>
+                <p className="text-sm text-text-muted">{row.campaign}</p>
               </div>
             ),
           },
@@ -217,20 +217,22 @@ export default function DealsPage() {
           {
             header: 'Type',
             accessor: (row) => (
-              <Badge>{row.type.replace('_', ' ')}</Badge>
+              <Badge variant="neutral">{row.type.replace('_', ' ')}</Badge>
             ),
           },
           {
             header: 'Contract Price',
-            accessor: (row) => `$${row.contractPrice.toLocaleString()}`,
+            accessor: (row) => <span className="text-text-primary">${row.contractPrice.toLocaleString()}</span>,
             className: 'text-right',
           },
           {
             header: 'Assignment Fee',
             accessor: (row) =>
-              row.assignmentFee
-                ? `$${row.assignmentFee.toLocaleString()}`
-                : '-',
+              row.assignmentFee ? (
+                <span className="text-text-primary">${row.assignmentFee.toLocaleString()}</span>
+              ) : (
+                <span className="text-text-muted">-</span>
+              ),
             className: 'text-right',
           },
           {
@@ -240,34 +242,43 @@ export default function DealsPage() {
                 <span
                   className={
                     row.grossProfit > 0
-                      ? 'text-green-600 font-medium'
-                      : 'text-red-600'
+                      ? 'text-success font-medium'
+                      : 'text-danger'
                   }
                 >
                   ${row.grossProfit.toLocaleString()}
                 </span>
               ) : (
-                '-'
+                <span className="text-text-muted">-</span>
               ),
             className: 'text-right',
           },
           {
             header: 'Contract Date',
             accessor: (row) =>
-              row.contractDate
-                ? format(new Date(row.contractDate), 'MMM d, yyyy')
-                : '-',
+              row.contractDate ? (
+                <span className="text-text-secondary">{format(new Date(row.contractDate), 'MMM d, yyyy')}</span>
+              ) : (
+                <span className="text-text-muted">-</span>
+              ),
           },
           {
             header: 'Close Date',
             accessor: (row) =>
-              row.closeDate
-                ? format(new Date(row.closeDate), 'MMM d, yyyy')
-                : '-',
+              row.closeDate ? (
+                <span className="text-text-secondary">{format(new Date(row.closeDate), 'MMM d, yyyy')}</span>
+              ) : (
+                <span className="text-text-muted">-</span>
+              ),
           },
           {
             header: 'Days',
-            accessor: (row) => (row.daysToClose ? row.daysToClose : '-'),
+            accessor: (row) =>
+              row.daysToClose ? (
+                <span className="text-text-primary">{row.daysToClose}</span>
+              ) : (
+                <span className="text-text-muted">-</span>
+              ),
             className: 'text-right',
           },
         ]}
