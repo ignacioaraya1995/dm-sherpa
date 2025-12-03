@@ -110,6 +110,26 @@ body {
     background-size: 16px;
   }
 
+  /* Input Field - Dark Theme */
+  .input-field {
+    @apply bg-dark-800 border border-glass-border rounded-lg px-4 py-2;
+    @apply text-text-primary placeholder:text-text-muted;
+    @apply focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50;
+    @apply transition-all duration-150;
+  }
+
+  .input-field option {
+    @apply bg-dark-800 text-text-primary;
+  }
+
+  select.input-field {
+    @apply appearance-none cursor-pointer pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+  }
+
   /* Primary Button */
   .btn-primary {
     @apply bg-gradient-accent text-white font-medium;

@@ -337,7 +337,7 @@ export function Sparkline({
   );
 }
 
-// Gauge Chart (for scores/percentages)
+// Gauge Chart (for scores/percentages) - Ring/Donut style
 interface GaugeChartProps {
   value: number;
   max?: number;
@@ -353,7 +353,7 @@ export function GaugeChart({
   color,
   size = 'md'
 }: GaugeChartProps) {
-  const percentage = (value / max) * 100;
+  const percentage = Math.min((value / max) * 100, 100);
   const getColor = () => {
     if (color) return color;
     if (percentage >= 80) return COLORS.emerald;
@@ -363,55 +363,61 @@ export function GaugeChart({
   };
 
   const sizeConfig = {
-    sm: { width: 80, stroke: 6, fontSize: 'text-lg' },
-    md: { width: 120, stroke: 8, fontSize: 'text-2xl' },
-    lg: { width: 160, stroke: 10, fontSize: 'text-3xl' },
+    sm: { width: 64, stroke: 6, fontSize: 'text-sm' },
+    md: { width: 100, stroke: 8, fontSize: 'text-xl' },
+    lg: { width: 140, stroke: 10, fontSize: 'text-2xl' },
   };
 
   const config = sizeConfig[size];
   const radius = (config.width - config.stroke) / 2;
-  const circumference = radius * Math.PI; // Half circle
+  const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
+  const activeColor = getColor();
 
   return (
-    <div className="flex flex-col items-center">
-      <svg width={config.width} height={config.width / 2 + 10} className="transform -rotate-90">
-        {/* Background arc */}
-        <circle
-          cx={config.width / 2}
-          cy={config.width / 2}
-          r={radius}
-          fill="none"
-          stroke="rgba(255,255,255,0.05)"
-          strokeWidth={config.stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={0}
-          strokeLinecap="round"
-          transform={`rotate(180 ${config.width / 2} ${config.width / 2})`}
-        />
-        {/* Value arc */}
-        <circle
-          cx={config.width / 2}
-          cy={config.width / 2}
-          r={radius}
-          fill="none"
-          stroke={getColor()}
-          strokeWidth={config.stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          transform={`rotate(180 ${config.width / 2} ${config.width / 2})`}
-          style={{ filter: `drop-shadow(0 0 8px ${getColor()}40)` }}
-        />
-      </svg>
-      <div className="text-center -mt-4">
-        <span className={`font-bold text-text-primary ${config.fontSize}`}>
-          {value}
-        </span>
-        {label && (
-          <p className="text-xs text-text-muted uppercase tracking-wider mt-1">{label}</p>
-        )}
+    <div className="flex flex-col items-center justify-center">
+      <div className="relative" style={{ width: config.width, height: config.width }}>
+        <svg
+          width={config.width}
+          height={config.width}
+          className="transform -rotate-90"
+        >
+          {/* Background circle */}
+          <circle
+            cx={config.width / 2}
+            cy={config.width / 2}
+            r={radius}
+            fill="none"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth={config.stroke}
+          />
+          {/* Progress circle */}
+          <circle
+            cx={config.width / 2}
+            cy={config.width / 2}
+            r={radius}
+            fill="none"
+            stroke={activeColor}
+            strokeWidth={config.stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 0.5s ease',
+              filter: `drop-shadow(0 0 6px ${activeColor}60)`,
+            }}
+          />
+        </svg>
+        {/* Center text */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`font-bold text-text-primary ${config.fontSize}`}>
+            {value}{max === 100 ? '%' : ''}
+          </span>
+        </div>
       </div>
+      {label && (
+        <p className="text-xs text-text-muted uppercase tracking-wider mt-2 text-center">{label}</p>
+      )}
     </div>
   );
 }
