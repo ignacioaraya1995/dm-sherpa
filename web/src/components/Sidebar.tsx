@@ -26,6 +26,7 @@ import {
   Brush,
   ChevronDown,
   ChevronRight,
+  Wand2,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -41,6 +42,7 @@ const navigation = [
     label: 'Campaigns',
     items: [
       { name: 'All Campaigns', href: '/campaigns', icon: Send },
+      { name: 'Smart Builder', href: '/campaigns/builder', icon: Wand2 },
       { name: 'A/B Testing', href: '/testing', icon: TestTube },
       { name: 'Triggers', href: '/triggers', icon: Zap },
     ],
