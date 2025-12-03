@@ -92,24 +92,24 @@ export default function TelephonyPage() {
           title="Total Numbers"
           value={mockPhoneNumbers.length}
           icon={Phone}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Active"
           value={activeNumbers}
           icon={CheckCircle}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Spam Flagged"
           value={flaggedNumbers}
           icon={AlertTriangle}
-          color="red"
+          color="danger"
         />
         <StatCard
           title="Avg Spam Score"
           value={`${(avgSpamScore * 100).toFixed(0)}%`}
-          color="yellow"
+          color="warning"
         />
       </div>
 

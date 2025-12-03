@@ -87,24 +87,24 @@ export default function TriggersPage() {
           title="Total Triggers"
           value={mockTriggers.length}
           icon={Zap}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Active"
           value={activeTriggers}
           icon={Play}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Total Executions"
           value={totalTriggered}
           icon={CheckCircle}
-          color="purple"
+          color="violet"
         />
         <StatCard
           title="Today's Executions"
           value="47"
-          color="yellow"
+          color="warning"
         />
       </div>
 
@@ -129,7 +129,7 @@ export default function TriggersPage() {
           {
             header: 'Action',
             accessor: (row) => (
-              <Badge variant="info">{row.actionType.replace(/_/g, ' ')}</Badge>
+              <Badge variant="cyan">{row.actionType.replace(/_/g, ' ')}</Badge>
             ),
           },
           {

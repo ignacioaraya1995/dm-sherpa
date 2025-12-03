@@ -102,25 +102,25 @@ export default function MarketsPage() {
           title="Active Markets"
           value={mockMarkets.length}
           icon={MapPin}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Total Properties"
           value={totalProperties.toLocaleString()}
           icon={Home}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Avg Median Price"
           value={`$${(avgMedianPrice / 1000).toFixed(0)}K`}
           icon={DollarSign}
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Avg Days on Market"
           value={avgDom.toFixed(0)}
           icon={TrendingUp}
-          color="purple"
+          color="violet"
         />
       </div>
 
@@ -195,7 +195,7 @@ export default function MarketsPage() {
           {
             header: 'Campaigns',
             accessor: (row) => (
-              <Badge variant={row.activeCampaigns > 0 ? 'success' : 'default'}>
+              <Badge variant={row.activeCampaigns > 0 ? 'success' : 'neutral'}>
                 {row.activeCampaigns} active
               </Badge>
             ),

@@ -70,7 +70,7 @@ export default function AnalyticsPage() {
           icon={TrendingUp}
           trend={15.2}
           trendLabel="vs last period"
-          color="green"
+          color="success"
         />
         <StatCard
           title="Cost per Contract"
@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
           icon={DollarSign}
           trend={-8.3}
           trendLabel="improvement"
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Contract Rate"
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
           icon={Target}
           trend={12.5}
           trendLabel="vs last period"
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Avg Cash Cycle"
@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
           icon={Clock}
           trend={-5.2}
           trendLabel="faster"
-          color="purple"
+          color="violet"
         />
       </div>
 

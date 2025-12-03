@@ -121,22 +121,22 @@ export default function CampaignsPage() {
           title="Active Campaigns"
           value={activeCampaigns}
           icon={Mail}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Total Mailed"
           value={totalMailed.toLocaleString()}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Total Calls"
           value={totalCalls.toLocaleString()}
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Total Contracts"
           value={totalContracts}
-          color="purple"
+          color="violet"
         />
       </div>
 

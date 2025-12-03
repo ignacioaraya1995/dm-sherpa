@@ -159,23 +159,23 @@ export default function PropertiesPage() {
           title="Total Properties"
           value={mockProperties.length.toLocaleString()}
           icon={Building2}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Total Value"
           value={`$${(totalValue / 1000000).toFixed(1)}M`}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Avg Motivation"
           value={`${(avgMotivation * 100).toFixed(0)}%`}
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Distressed"
           value={distressedCount}
           icon={AlertTriangle}
-          color="red"
+          color="danger"
         />
       </div>
 
@@ -287,7 +287,7 @@ export default function PropertiesPage() {
             header: 'Flags',
             accessor: (row) => (
               <div className="flex flex-wrap gap-1">
-                {row.isVacant && <Badge variant="info">Vacant</Badge>}
+                {row.isVacant && <Badge variant="cyan">Vacant</Badge>}
                 {row.isAbsenteeOwner && <Badge>Absentee</Badge>}
               </div>
             ),

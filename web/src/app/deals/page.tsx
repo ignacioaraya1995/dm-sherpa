@@ -142,25 +142,25 @@ export default function DealsPage() {
           icon={DollarSign}
           trend={18.5}
           trendLabel="vs last month"
-          color="green"
+          color="success"
         />
         <StatCard
           title="Avg Profit/Deal"
           value={`$${avgProfit.toLocaleString()}`}
           icon={TrendingUp}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Avg Days to Close"
           value={avgDaysToClose.toFixed(0)}
           icon={Clock}
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Pipeline Value"
           value={`$${pipelineValue.toLocaleString()}`}
           icon={Target}
-          color="purple"
+          color="violet"
         />
       </div>
 

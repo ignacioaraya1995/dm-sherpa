@@ -2,74 +2,150 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { clsx } from 'clsx';
 import {
   LayoutDashboard,
-  Mail,
-  Building2,
-  Users,
-  TrendingUp,
-  Phone,
+  Send,
+  Home,
+  Handshake,
   MapPin,
-  DollarSign,
-  Settings,
+  BarChart3,
+  Phone,
   Zap,
+  Users,
+  Settings,
+  Activity,
+  DollarSign,
+  TestTube,
+  Target,
+  TrendingUp,
+  AlertTriangle,
+  Calendar,
+  Palette,
 } from 'lucide-react';
+import clsx from 'clsx';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Campaigns', href: '/campaigns', icon: Mail },
-  { name: 'Properties', href: '/properties', icon: Building2 },
-  { name: 'Deals', href: '/deals', icon: DollarSign },
-  { name: 'Markets', href: '/markets', icon: MapPin },
-  { name: 'Telephony', href: '/telephony', icon: Phone },
-  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-  { name: 'Triggers', href: '/triggers', icon: Zap },
-  { name: 'Accounts', href: '/accounts', icon: Users },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  {
+    label: 'Overview',
+    items: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { name: 'Diagnostics', href: '/diagnostics', icon: Activity },
+    ],
+  },
+  {
+    label: 'Campaigns',
+    items: [
+      { name: 'All Campaigns', href: '/campaigns', icon: Send },
+      { name: 'A/B Testing', href: '/testing', icon: TestTube },
+      { name: 'Creative Library', href: '/creative', icon: Palette },
+      { name: 'Triggers', href: '/triggers', icon: Zap },
+    ],
+  },
+  {
+    label: 'Pipeline',
+    items: [
+      { name: 'Properties', href: '/properties', icon: Home },
+      { name: 'Deals', href: '/deals', icon: Handshake },
+      { name: 'Markets', href: '/markets', icon: MapPin },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+      { name: 'Attribution', href: '/attribution', icon: TrendingUp },
+      { name: 'Offer Calibration', href: '/offers', icon: DollarSign },
+      { name: 'Seasonality', href: '/seasonality', icon: Calendar },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { name: 'Telephony', href: '/telephony', icon: Phone },
+      { name: 'Health Monitor', href: '/health', icon: AlertTriangle },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { name: 'Accounts', href: '/accounts', icon: Users },
+      { name: 'Settings', href: '/settings', icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col w-64 bg-gray-900 text-white">
-      <div className="flex items-center h-16 px-4 border-b border-gray-800">
-        <Mail className="h-8 w-8 text-primary-500" />
-        <span className="ml-2 text-xl font-bold">DM Sherpa</span>
-      </div>
-      <nav className="flex-1 px-2 py-4 space-y-1">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href ||
-            (item.href !== '/' && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={clsx(
-                'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              )}
-            >
-              <item.icon className="h-5 w-5 mr-3" />
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="p-4 border-t border-gray-800">
-        <div className="flex items-center">
-          <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center">
-            <span className="text-sm font-medium">A</span>
+    <aside className="w-64 h-screen flex flex-col bg-dark-800/70 backdrop-blur-xl border-r border-glass-border">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-6 border-b border-glass-border">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center shadow-glow-accent">
+            <Target className="w-4 h-4 text-white" />
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium">Admin User</p>
-            <p className="text-xs text-gray-400">admin@example.com</p>
+          <span className="text-lg font-semibold text-text-primary">DM Sherpa</span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
+        {navigation.map((group) => (
+          <div key={group.label} className="mb-6">
+            <div className="px-3 mb-2">
+              <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                {group.label}
+              </span>
+            </div>
+            <ul className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <li key={item.name}>
+                    <Link
+                      href={item.href}
+                      className={clsx(
+                        'nav-item',
+                        isActive && 'nav-item-active'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-sm font-medium">{item.name}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      {/* System Health Footer */}
+      <div className="p-4 border-t border-glass-border">
+        <div className="glass-card-sm p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+              System Health
+            </span>
+            <div className="health-indicator">
+              <div className="health-dot health-dot-healthy" />
+              <span className="text-xs text-success">Operational</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3 h-3 text-text-muted" />
+              <span className="text-text-secondary">12/12 lines</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3 h-3 text-text-muted" />
+              <span className="text-text-secondary">99.8% uptime</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

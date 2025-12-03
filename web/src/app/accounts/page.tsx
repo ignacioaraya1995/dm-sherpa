@@ -63,11 +63,11 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
-          <p className="text-gray-500">Manage your organization accounts</p>
+          <h1 className="text-2xl font-bold text-text-primary">Accounts</h1>
+          <p className="text-text-secondary">Manage your organization accounts</p>
         </div>
-        <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-          <Plus className="h-5 w-5 mr-2" />
+        <button className="btn-primary flex items-center gap-2">
+          <Plus className="h-5 w-5" />
           New Account
         </button>
       </div>
@@ -78,25 +78,25 @@ export default function AccountsPage() {
           title="Total Accounts"
           value={accounts.length}
           icon={Building2}
-          color="blue"
+          color="accent"
         />
         <StatCard
           title="Total Users"
           value={totalUsers}
           icon={Users}
-          color="green"
+          color="success"
         />
         <StatCard
           title="Total Campaigns"
           value={totalCampaigns}
           icon={Mail}
-          color="yellow"
+          color="warning"
         />
         <StatCard
           title="Total Deals"
           value={totalDeals}
           icon={DollarSign}
-          color="purple"
+          color="violet"
         />
       </div>
 
