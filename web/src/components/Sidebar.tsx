@@ -104,11 +104,27 @@ export function Sidebar() {
     }));
   };
 
+  // Check if a specific nav item is active
+  const isItemActive = (href: string, allItems: typeof navigation[0]['items']) => {
+    // Exact match is always active
+    if (pathname === href) return true;
+
+    // For non-root paths, check if pathname starts with href
+    // BUT only if no other sibling item is a better match
+    if (href !== '/' && pathname.startsWith(href + '/')) {
+      // Check if any sibling is a more specific match
+      const hasMoreSpecificMatch = allItems.some(
+        (sibling) => sibling.href !== href && pathname.startsWith(sibling.href)
+      );
+      return !hasMoreSpecificMatch;
+    }
+
+    return false;
+  };
+
   // Check if any item in a group is active
   const isGroupActive = (items: typeof navigation[0]['items']) => {
-    return items.some((item) =>
-      pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
-    );
+    return items.some((item) => isItemActive(item.href, items));
   };
 
   return (
@@ -168,8 +184,7 @@ export function Sidebar() {
               >
                 <ul className="space-y-1 pl-2">
                   {group.items.map((item) => {
-                    const isActive = pathname === item.href ||
-                      (item.href !== '/' && pathname.startsWith(item.href + '/'));
+                    const isActive = isItemActive(item.href, group.items);
                     const Icon = item.icon;
                     return (
                       <li key={item.name}>
