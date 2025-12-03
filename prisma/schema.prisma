@@ -1,0 +1,1688 @@
+// Direct Mail Performance OS - Prisma Schema
+// For Real Estate & Home Services (Wholesalers, Flippers, Roofers, etc.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// CORE ENTITIES
+// =============================================================================
+
+model Account {
+  id          String   @id @default(uuid())
+  name        String
+  type        AccountType
+  status      AccountStatus @default(ACTIVE)
+  settings    Json     @default("{}")
+
+  // Synthetic data flag
+  isSynthetic Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users               User[]
+  markets             AccountMarket[]
+  campaigns           Campaign[]
+  segments            Segment[]
+  phoneNumbers        PhoneNumber[]
+  offerStrategies     OfferStrategy[]
+  designTemplates     DesignTemplate[]
+  deals               Deal[]
+  talkTracks          TalkTrack[]
+  cashCycleProfiles   CashCycleProfile[]
+
+  @@index([type])
+  @@index([status])
+}
+
+enum AccountType {
+  WHOLESALER
+  FLIPPER
+  BUY_AND_HOLD
+  TURNKEY_OPERATOR
+  HEDGE_FUND
+  ROOFER
+  HOME_SERVICES
+  PORTFOLIO_BUYER
+}
+
+enum AccountStatus {
+  ACTIVE
+  PAUSED
+  SUSPENDED
+  CLOSED
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String
+  role        UserRole
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  isAiAgent   Boolean  @default(false)
+  apiKey      String?  @unique
+
+  settings    Json     @default("{}")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLoginAt DateTime?
+
+  // Relations
+  createdCampaigns    Campaign[]   @relation("CampaignCreator")
+  assignedCalls       CallEvent[]  @relation("CallAssignee")
+  createdDeals        Deal[]       @relation("DealCreator")
+  diagnosticSnapshots DiagnosticSnapshot[]
+
+  @@index([accountId])
+  @@index([role])
+}
+
+enum UserRole {
+  ADMIN
+  MARKETING_MANAGER
+  ANALYST
+  ACQUISITIONS_MANAGER
+  AE  // Account Executive
+  AI_AGENT
+}
+
+// =============================================================================
+// MARKET & GEOGRAPHIC DATA
+// =============================================================================
+
+model Market {
+  id           String   @id @default(uuid())
+  name         String
+  state        String
+  county       String
+  city         String?
+
+  // Market-level metrics
+  medianPrice      Decimal?  @db.Decimal(12,2)
+  avgDom           Int?      // Average Days on Market
+  priceAppreciation Decimal? @db.Decimal(5,2) // YoY %
+  buyerDensityScore Decimal? @db.Decimal(5,4) // 0-1 scale
+  spreadHistory     Json     @default("[]") // Historical spread data
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  accounts            AccountMarket[]
+  zipCodes            ZipCode[]
+  properties          Property[]
+  seasonalityProfiles SeasonalityProfile[]
+  dispoData           MarketDispoData[]
+
+  @@unique([state, county])
+  @@index([state])
+}
+
+model AccountMarket {
+  id        String   @id @default(uuid())
+  accountId String
+  marketId  String
+  account   Account  @relation(fields: [accountId], references: [id])
+  market    Market   @relation(fields: [marketId], references: [id])
+
+  // Account-specific market settings
+  avmBiasFactor  Decimal  @default(1.0) @db.Decimal(5,4)
+  minSpread      Decimal? @db.Decimal(12,2)
+  maxArv         Decimal? @db.Decimal(12,2)
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([accountId, marketId])
+}
+
+model ZipCode {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  marketId   String
+  market     Market   @relation(fields: [marketId], references: [id])
+
+  // Zip-level metrics
+  avgDom            Int?
+  medianPrice       Decimal?  @db.Decimal(12,2)
+  buyerDensityScore Decimal?  @db.Decimal(5,4)
+  investorActivityScore Decimal? @db.Decimal(5,4)
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  properties Property[]
+
+  @@index([marketId])
+}
+
+// =============================================================================
+// PROPERTY & OWNER DATA
+// =============================================================================
+
+model Property {
+  id            String   @id @default(uuid())
+
+  // Address
+  streetAddress String
+  city          String
+  state         String
+  zipCodeId     String
+  zipCode       ZipCode  @relation(fields: [zipCodeId], references: [id])
+  marketId      String
+  market        Market   @relation(fields: [marketId], references: [id])
+
+  // Property details
+  propertyType  PropertyType
+  beds          Int?
+  baths         Decimal? @db.Decimal(3,1)
+  sqft          Int?
+  lotSqft       Int?
+  yearBuilt     Int?
+
+  // Valuation
+  avmValue      Decimal? @db.Decimal(12,2)
+  arvValue      Decimal? @db.Decimal(12,2) // After Repair Value
+  priceBand     PriceBand?
+  lastSalePrice Decimal? @db.Decimal(12,2)
+  lastSaleDate  DateTime?
+
+  // Equity & Financial
+  estimatedEquity    Decimal? @db.Decimal(12,2)
+  estimatedMortgage  Decimal? @db.Decimal(12,2)
+  equityPercent      Decimal? @db.Decimal(5,2)
+
+  // Physical condition flags
+  hasCodeViolation   Boolean @default(false)
+  lastPermitDate     DateTime?
+  conditionScore     Decimal? @db.Decimal(3,2) // 0-10 scale
+  roofAge            Int?
+
+  // Owner status
+  isVacant           Boolean @default(false)
+  isAbsenteeOwner    Boolean @default(false)
+
+  // Computed scores
+  dispoScore         Decimal? @db.Decimal(5,4) // 0-1
+  motivationScore    Decimal? @db.Decimal(5,4) // 0-1
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner           Owner?
+  distressFlags   DistressFlag[]
+  segmentMembers  SegmentMember[]
+  mailPieces      MailPiece[]
+  deals           Deal[]
+
+  @@index([marketId])
+  @@index([zipCodeId])
+  @@index([priceBand])
+  @@index([isAbsenteeOwner])
+  @@index([isVacant])
+  @@index([dispoScore])
+  @@index([motivationScore])
+}
+
+enum PropertyType {
+  SINGLE_FAMILY
+  MULTI_FAMILY
+  CONDO
+  TOWNHOUSE
+  MANUFACTURED
+  LAND
+  COMMERCIAL
+}
+
+enum PriceBand {
+  BAND_0_100K      // $0-100k
+  BAND_100_200K    // $100k-200k
+  BAND_200_300K    // $200k-300k
+  BAND_300_500K    // $300k-500k
+  BAND_500K_PLUS   // $500k+
+}
+
+model Owner {
+  id           String   @id @default(uuid())
+  propertyId   String   @unique
+  property     Property @relation(fields: [propertyId], references: [id])
+
+  // Owner info (synthetic for dummy data)
+  firstName    String
+  lastName     String
+  fullName     String
+
+  // Mailing address (may differ from property)
+  mailingStreet  String?
+  mailingCity    String?
+  mailingState   String?
+  mailingZip     String?
+
+  // Contact
+  phone        String?
+  email        String?
+
+  // Ownership
+  ownershipType   OwnershipType
+  ownershipLength Int?  // years
+  isAbsentee      Boolean @default(false)
+  distanceFromProperty Decimal? @db.Decimal(10,2) // km
+
+  // Corporate owner flag
+  isCorporate     Boolean @default(false)
+  corporateName   String?
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isAbsentee])
+  @@index([ownershipType])
+}
+
+enum OwnershipType {
+  OWNER_OCCUPIED
+  ABSENTEE_IN_STATE
+  ABSENTEE_OUT_OF_STATE
+  CORPORATE
+  TRUST
+  ESTATE
+}
+
+// =============================================================================
+// DISTRESS DATA
+// =============================================================================
+
+model DistressFlag {
+  id           String   @id @default(uuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+
+  type         DistressType
+  severity     DistressSeverity
+
+  // Timing
+  startDate    DateTime
+  endDate      DateTime?
+  daysActive   Int?
+
+  // Type-specific data
+  metadata     Json     @default("{}")
+  // Examples:
+  // Pre-foreclosure: { auctionDate, defaultAmount, lender }
+  // Tax lien: { amount, yearsDelinquent }
+  // Probate: { decedentName, caseNumber }
+  // Code violation: { violationType, fineAmount }
+
+  source       String?  // Data source
+
+  isActive     Boolean  @default(true)
+  isSynthetic  Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([type])
+  @@index([severity])
+  @@index([isActive])
+  @@index([startDate])
+}
+
+enum DistressType {
+  PRE_FORECLOSURE
+  FORECLOSURE
+  PROBATE
+  INHERITANCE
+  TAX_LIEN
+  TAX_DELINQUENT
+  DIVORCE
+  CODE_VIOLATION
+  EVICTION
+  BANKRUPTCY
+  VACANT
+  ABSENTEE
+  HIGH_EQUITY
+  TIRED_LANDLORD
+  ROOF_DAMAGE
+  STORM_DAMAGE
+}
+
+enum DistressSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// =============================================================================
+// DISPOSITION (DISPO) DATA
+// =============================================================================
+
+model MarketDispoData {
+  id          String   @id @default(uuid())
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id])
+
+  priceBand   PriceBand
+
+  // DOM metrics
+  avgDom           Int
+  medianDom        Int
+  domTrend         Decimal? @db.Decimal(5,2) // % change
+
+  // Transaction metrics
+  listToSaleRatio  Decimal  @db.Decimal(5,4)
+  avgSpread        Decimal  @db.Decimal(12,2)
+  medianSpread     Decimal  @db.Decimal(12,2)
+  spreadTrend      Decimal? @db.Decimal(5,2)
+
+  // Buyer metrics
+  buyerDensity     Decimal  @db.Decimal(5,4)
+  investorExitMix  Json     @default("{}") // { flip: 0.4, rental: 0.3, wholesale: 0.3 }
+
+  // Computed score
+  dispoScore       Decimal  @db.Decimal(5,4)
+
+  // Time period
+  periodStart DateTime
+  periodEnd   DateTime
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([marketId, priceBand, periodStart])
+  @@index([marketId])
+  @@index([priceBand])
+  @@index([dispoScore])
+}
+
+// =============================================================================
+// SEGMENTS
+// =============================================================================
+
+model Segment {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  name        String
+  description String?
+
+  // Filter definition (JSON-based query)
+  filters     Json     // Complex filter structure
+  // Example: {
+  //   distressTypes: ["PRE_FORECLOSURE", "TAX_LIEN"],
+  //   priceBands: ["BAND_100_200K", "BAND_200_300K"],
+  //   minEquityPercent: 30,
+  //   isAbsentee: true,
+  //   minDispoScore: 0.7,
+  //   markets: ["market-uuid-1", "market-uuid-2"]
+  // }
+
+  // Computed stats (refreshed periodically)
+  memberCount      Int      @default(0)
+  avgFreshnessDays Decimal? @db.Decimal(5,1)
+  avgDispoScore    Decimal? @db.Decimal(5,4)
+  avgMotivation    Decimal? @db.Decimal(5,4)
+  distressMix      Json     @default("{}") // { PRE_FORECLOSURE: 0.3, TAX_LIEN: 0.4, ... }
+
+  // Targeting rules
+  maxMailsPerProperty   Int @default(6)
+  minDaysBetweenMails   Int @default(21)
+  excludeRecentDeals    Boolean @default(true)
+
+  isActive    Boolean  @default(true)
+  isSynthetic Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastRefreshedAt DateTime?
+
+  // Relations
+  members     SegmentMember[]
+  campaigns   CampaignSegment[]
+
+  @@index([accountId])
+  @@index([isActive])
+}
+
+model SegmentMember {
+  id          String   @id @default(uuid())
+  segmentId   String
+  segment     Segment  @relation(fields: [segmentId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  // Snapshot of key metrics at time of addition
+  dispoScoreSnapshot    Decimal? @db.Decimal(5,4)
+  motivationSnapshot    Decimal? @db.Decimal(5,4)
+  distressFlagsSnapshot Json     @default("[]")
+
+  addedAt     DateTime @default(now())
+  removedAt   DateTime?
+
+  @@unique([segmentId, propertyId])
+  @@index([segmentId])
+  @@index([propertyId])
+}
+
+// =============================================================================
+// CAMPAIGNS & VARIANTS
+// =============================================================================
+
+model Campaign {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  createdById String
+  createdBy   User     @relation("CampaignCreator", fields: [createdById], references: [id])
+
+  name        String
+  description String?
+  type        CampaignType
+  goal        CampaignGoal
+
+  status      CampaignStatus @default(DRAFT)
+
+  // Budget
+  totalBudget    Decimal? @db.Decimal(12,2)
+  spentBudget    Decimal  @default(0) @db.Decimal(12,2)
+
+  // Timing
+  startDate      DateTime?
+  endDate        DateTime?
+
+  // Multi-touch flow settings
+  isMultiTouch   Boolean  @default(true)
+  touchCount     Int      @default(3)
+
+  // Experiment settings
+  isExperiment      Boolean @default(false)
+  experimentType    ExperimentType?
+  baselineResponse  Decimal? @db.Decimal(5,4)
+  minDetectableEffect Decimal? @db.Decimal(5,4)
+  confidenceLevel   Decimal? @db.Decimal(3,2) // e.g., 0.95
+
+  // Performance summary (computed)
+  totalMailed      Int      @default(0)
+  totalDelivered   Int      @default(0)
+  totalCalls       Int      @default(0)
+  totalQualifiedLeads Int   @default(0)
+  totalContracts   Int      @default(0)
+  responseRate     Decimal? @db.Decimal(5,4)
+  contractRate     Decimal? @db.Decimal(5,4)
+  grossProfit      Decimal  @default(0) @db.Decimal(12,2)
+  roi              Decimal? @db.Decimal(8,4)
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  launchedAt  DateTime?
+  completedAt DateTime?
+
+  // Relations
+  segments            CampaignSegment[]
+  variants            Variant[]
+  batches             Batch[]
+  steps               CampaignStep[]
+  diagnosticSnapshots DiagnosticSnapshot[]
+
+  @@index([accountId])
+  @@index([status])
+  @@index([type])
+  @@index([isExperiment])
+  @@index([createdAt])
+}
+
+enum CampaignType {
+  WHOLESALER
+  FLIPPER
+  BUY_AND_HOLD
+  ROOFER
+  HOME_SERVICES
+  MIXED
+}
+
+enum CampaignGoal {
+  CONTRACTS
+  APPOINTMENTS
+  LEADS
+  BRAND_AWARENESS
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ExperimentType {
+  A_B_TEST
+  MULTI_ARM_BANDIT
+  SEQUENTIAL
+}
+
+model CampaignSegment {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  segmentId   String
+  segment     Segment  @relation(fields: [segmentId], references: [id])
+
+  // Segment-specific budget allocation
+  budgetPercent Decimal @default(100) @db.Decimal(5,2)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, segmentId])
+}
+
+model CampaignStep {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+
+  stepNumber  Int
+  name        String?
+
+  // Timing
+  daysSincePrevious Int     @default(21)
+  daysSinceTrigger  Int?    // For trigger-based steps
+
+  // Default design for this step
+  designTemplateId String?
+  designTemplate   DesignTemplate? @relation(fields: [designTemplateId], references: [id])
+
+  // Default offer strategy
+  offerStrategyId String?
+  offerStrategy   OfferStrategy? @relation(fields: [offerStrategyId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  variants    Variant[]
+
+  @@unique([campaignId, stepNumber])
+  @@index([campaignId])
+}
+
+model Variant {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  stepId      String?
+  step        CampaignStep? @relation(fields: [stepId], references: [id])
+
+  name        String
+  description String?
+
+  // Variant configuration
+  designVersionId  String?
+  designVersion    DesignVersion? @relation(fields: [designVersionId], references: [id])
+  offerStrategyId  String?
+  offerStrategy    OfferStrategy? @relation(fields: [offerStrategyId], references: [id])
+
+  // Traffic allocation
+  allocationPercent Decimal @default(50) @db.Decimal(5,2)
+
+  // Performance metrics
+  piecesMailed     Int      @default(0)
+  piecesDelivered  Int      @default(0)
+  calls            Int      @default(0)
+  qualifiedCalls   Int      @default(0)
+  contracts        Int      @default(0)
+  grossProfit      Decimal  @default(0) @db.Decimal(12,2)
+
+  // Computed rates
+  responseRate     Decimal? @db.Decimal(5,4)
+  contractRate     Decimal? @db.Decimal(5,4)
+  profitPerPiece   Decimal? @db.Decimal(8,4)
+
+  // Experiment results
+  isControl        Boolean  @default(false)
+  isWinner         Boolean?
+  pValue           Decimal? @db.Decimal(8,6)
+  liftVsControl    Decimal? @db.Decimal(8,4)
+  confidenceInterval Json?  // { lower: 0.01, upper: 0.05 }
+
+  isActive    Boolean @default(true)
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  batches     BatchVariant[]
+  mailPieces  MailPiece[]
+
+  @@index([campaignId])
+  @@index([stepId])
+  @@index([isWinner])
+}
+
+model Batch {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+
+  batchNumber Int
+  name        String?
+
+  status      BatchStatus @default(PENDING)
+
+  // Timing
+  scheduledDate DateTime?
+  sentDate      DateTime?
+
+  // Volume
+  targetQuantity Int
+  actualQuantity Int @default(0)
+
+  // Performance (aggregated from variants)
+  totalDelivered Int @default(0)
+  totalCalls     Int @default(0)
+  totalContracts Int @default(0)
+
+  // Print vendor info
+  printJobId     String?
+  printStatus    String?
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  variants    BatchVariant[]
+  mailPieces  MailPiece[]
+
+  @@unique([campaignId, batchNumber])
+  @@index([campaignId])
+  @@index([status])
+}
+
+enum BatchStatus {
+  PENDING
+  SCHEDULED
+  PRINTING
+  MAILED
+  DELIVERED
+  COMPLETED
+}
+
+model BatchVariant {
+  id          String   @id @default(uuid())
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  variantId   String
+  variant     Variant  @relation(fields: [variantId], references: [id])
+
+  quantity    Int
+
+  createdAt   DateTime @default(now())
+
+  @@unique([batchId, variantId])
+}
+
+// =============================================================================
+// DESIGN & CREATIVE
+// =============================================================================
+
+model DesignTemplate {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  name        String
+  format      MailFormat
+  description String?
+
+  // Template settings
+  supportsOffer   Boolean @default(true)
+  offerPlacement  String? // e.g., "check_amount", "body_text"
+
+  isActive    Boolean @default(true)
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  versions    DesignVersion[]
+  campaignSteps CampaignStep[]
+
+  @@index([accountId])
+  @@index([format])
+}
+
+enum MailFormat {
+  CHECK_LETTER
+  GENERIC_LETTER
+  STANDARD_POSTCARD
+  OVERSIZED_POSTCARD
+  HANDWRITTEN_POSTCARD
+  SNAP_PACK
+  SORRY_WE_MISSED_YOU
+  YELLOW_LETTER
+}
+
+model DesignVersion {
+  id              String   @id @default(uuid())
+  templateId      String
+  template        DesignTemplate @relation(fields: [templateId], references: [id])
+
+  versionNumber   Int
+  name            String?
+
+  // Creative content
+  headline        String?
+  bodyContent     String?
+  callToAction    String?
+  imageUrl        String?
+
+  // A/B test elements
+  testElements    Json     @default("[]") // What's different in this version
+
+  isActive    Boolean @default(true)
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  variants    Variant[]
+  mailPieces  MailPiece[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId])
+}
+
+// =============================================================================
+// OFFER STRATEGIES
+// =============================================================================
+
+model OfferStrategy {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  name        String
+  description String?
+
+  // Base offer percentages by price band
+  baseOffers  Json     // { "BAND_0_100K": 0.65, "BAND_100_200K": 0.70, ... }
+
+  // Adjustments
+  distressAdjustments Json @default("{}") // { "PRE_FORECLOSURE": -0.05, "PROBATE": -0.03 }
+  dispoAdjustments    Json @default("{}") // { "lowDispoScore": -0.05, "highDom": -0.03 }
+
+  // Constraints
+  minOfferPercent  Decimal @default(0.50) @db.Decimal(5,4)
+  maxOfferPercent  Decimal @default(0.90) @db.Decimal(5,4)
+
+  // Range vs fixed
+  useOfferRange    Boolean @default(false)
+  rangeWidth       Decimal? @db.Decimal(5,4) // e.g., 0.05 = ±5%
+
+  isActive    Boolean @default(true)
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  campaignSteps CampaignStep[]
+  variants      Variant[]
+  mailPieces    MailPiece[]
+
+  @@index([accountId])
+}
+
+// =============================================================================
+// MAIL TRACKING
+// =============================================================================
+
+model MailPiece {
+  id          String   @id @default(uuid())
+
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  variantId   String
+  variant     Variant  @relation(fields: [variantId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  // Design used
+  designVersionId String?
+  designVersion   DesignVersion? @relation(fields: [designVersionId], references: [id])
+
+  // Offer details
+  offerStrategyId String?
+  offerStrategy   OfferStrategy? @relation(fields: [offerStrategyId], references: [id])
+  offerAmount     Decimal? @db.Decimal(12,2)
+  offerPercent    Decimal? @db.Decimal(5,4)
+
+  // Tracking
+  trackingNumber  String?
+  phoneNumberId   String?
+  phoneNumber     PhoneNumber? @relation(fields: [phoneNumberId], references: [id])
+
+  // Status
+  status          MailStatus @default(CREATED)
+
+  // Cost
+  printCost       Decimal? @db.Decimal(8,4)
+  postageCost     Decimal? @db.Decimal(8,4)
+  totalCost       Decimal? @db.Decimal(8,4)
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  events      MailEvent[]
+  calls       CallEvent[]
+
+  @@index([batchId])
+  @@index([variantId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([phoneNumberId])
+}
+
+enum MailStatus {
+  CREATED
+  QUEUED
+  PRINTING
+  MAILED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  UNDELIVERABLE
+}
+
+model MailEvent {
+  id          String   @id @default(uuid())
+  mailPieceId String
+  mailPiece   MailPiece @relation(fields: [mailPieceId], references: [id])
+
+  eventType   MailEventType
+  timestamp   DateTime @default(now())
+
+  // Location (if available from USPS)
+  location    String?
+
+  // Additional data
+  metadata    Json     @default("{}")
+
+  isSynthetic Boolean @default(false)
+
+  @@index([mailPieceId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+enum MailEventType {
+  CREATED
+  SENT_TO_PRINTER
+  PRINTED
+  MAILED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FORWARDED
+  RETURNED_TO_SENDER
+  RETURN_UNKNOWN
+  RETURN_VACANT
+  RETURN_REFUSED
+}
+
+// =============================================================================
+// TELEPHONY
+// =============================================================================
+
+model PhoneNumber {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  number      String   @unique
+  type        PhoneNumberType
+
+  // Region assignment
+  region      String?
+  state       String?
+  areaCode    String?
+
+  // Status & health
+  status            PhoneStatus @default(ACTIVE)
+  registrationStatus String?    // CNAM, STIR/SHAKEN
+  spamScore         Decimal?    @db.Decimal(5,4) // 0-1, lower is better
+  lastHealthCheck   DateTime?
+
+  // Expected performance baseline
+  expectedCallsPerThousand Decimal? @db.Decimal(6,2)
+
+  // Provider info
+  providerId   String?
+  providerSid  String? // Twilio SID, etc.
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  assignments PhoneNumberAssignment[]
+  mailPieces  MailPiece[]
+  calls       CallEvent[]
+  healthLogs  PhoneHealthLog[]
+
+  @@index([accountId])
+  @@index([status])
+  @@index([region])
+}
+
+enum PhoneNumberType {
+  LOCAL
+  TOLL_FREE
+  TRACKING
+}
+
+enum PhoneStatus {
+  ACTIVE
+  INACTIVE
+  SPAM_FLAGGED
+  BLOCKED
+  PENDING_REGISTRATION
+}
+
+model PhoneNumberAssignment {
+  id            String   @id @default(uuid())
+  phoneNumberId String
+  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
+
+  // What this number is assigned to
+  campaignId    String?
+  variantId     String?
+  marketId      String?
+
+  // Routing
+  routingType   RoutingType
+  routingTarget String    // User ID, team ID, or IVR config
+
+  startDate     DateTime @default(now())
+  endDate       DateTime?
+
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([phoneNumberId])
+  @@index([campaignId])
+  @@index([isActive])
+}
+
+enum RoutingType {
+  DIRECT_TO_USER
+  ROUND_ROBIN_TEAM
+  IVR
+  EXTERNAL_FORWARD
+}
+
+model PhoneHealthLog {
+  id            String   @id @default(uuid())
+  phoneNumberId String
+  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
+
+  checkType     HealthCheckType
+  timestamp     DateTime @default(now())
+
+  // Results
+  isHealthy     Boolean
+  spamScore     Decimal? @db.Decimal(5,4)
+  testCallSuccess Boolean?
+  latencyMs     Int?
+
+  // Issues found
+  issues        Json     @default("[]")
+
+  isSynthetic   Boolean  @default(false)
+
+  @@index([phoneNumberId])
+  @@index([timestamp])
+}
+
+enum HealthCheckType {
+  AUTOMATED_TEST_CALL
+  SPAM_CHECK
+  REGISTRATION_CHECK
+  ROUTING_VALIDATION
+}
+
+// =============================================================================
+// CALLS & LEADS
+// =============================================================================
+
+model CallEvent {
+  id           String   @id @default(uuid())
+
+  // Source
+  phoneNumberId String
+  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
+  mailPieceId   String?
+  mailPiece     MailPiece? @relation(fields: [mailPieceId], references: [id])
+
+  // Assignment
+  assigneeId    String?
+  assignee      User?    @relation("CallAssignee", fields: [assigneeId], references: [id])
+
+  // Call details
+  callerNumber  String?
+  callSid       String?  // Provider call ID
+
+  // Timing
+  startTime     DateTime
+  endTime       DateTime?
+  duration      Int?     // seconds
+  ringDuration  Int?     // seconds before answer
+
+  // Outcome
+  status        CallStatus
+  outcome       CallOutcome?
+
+  // Talk track used
+  talkTrackId   String?
+  talkTrack     TalkTrack? @relation(fields: [talkTrackId], references: [id])
+
+  // Lead qualification
+  isQualified   Boolean  @default(false)
+  qualificationScore Decimal? @db.Decimal(5,4)
+
+  // Recording
+  recordingUrl  String?
+  transcriptUrl String?
+
+  // Notes
+  notes         String?
+
+  isSynthetic   Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  conversion    ConversionEvent?
+
+  @@index([phoneNumberId])
+  @@index([mailPieceId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([outcome])
+  @@index([startTime])
+}
+
+enum CallStatus {
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  VOICEMAIL
+  FAILED
+  BUSY
+}
+
+enum CallOutcome {
+  INTERESTED
+  NOT_INTERESTED
+  CALLBACK_REQUESTED
+  WRONG_NUMBER
+  NO_ANSWER
+  LEFT_VOICEMAIL
+  DO_NOT_CALL
+  APPOINTMENT_SET
+  CONTRACT_DISCUSSED
+}
+
+// =============================================================================
+// CONVERSIONS & DEALS
+// =============================================================================
+
+model ConversionEvent {
+  id          String   @id @default(uuid())
+
+  callId      String   @unique
+  call        CallEvent @relation(fields: [callId], references: [id])
+
+  type        ConversionType
+  timestamp   DateTime @default(now())
+
+  // Attribution
+  attributionWindow Int? // days from mail to conversion
+
+  // Deal link (if applicable)
+  dealId      String?  @unique
+  deal        Deal?    @relation(fields: [dealId], references: [id])
+
+  isSynthetic Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+
+  @@index([type])
+  @@index([timestamp])
+}
+
+enum ConversionType {
+  APPOINTMENT
+  OFFER_MADE
+  CONTRACT_SIGNED
+  DEAL_CLOSED
+}
+
+model Deal {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  createdById String
+  createdBy   User     @relation("DealCreator", fields: [createdById], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  // Deal details
+  status      DealStatus @default(PENDING)
+  type        DealType
+
+  // Pricing
+  mailedOffer     Decimal? @db.Decimal(12,2)
+  negotiatedPrice Decimal? @db.Decimal(12,2)
+  contractPrice   Decimal  @db.Decimal(12,2)
+  arvAtContract   Decimal? @db.Decimal(12,2)
+
+  // Spread calculation
+  assignmentFee   Decimal? @db.Decimal(12,2) // For wholesale
+  rehabBudget     Decimal? @db.Decimal(12,2) // For flips
+  salePrice       Decimal? @db.Decimal(12,2)
+  grossProfit     Decimal? @db.Decimal(12,2)
+  netProfit       Decimal? @db.Decimal(12,2)
+
+  // Dispo outcome
+  dispoType       DispoType?
+  daysToClose     Int?
+  buyerId         String?
+
+  // Timeline
+  contractDate    DateTime?
+  closeDate       DateTime?
+  cashReceivedDate DateTime?
+
+  // Attribution to mail
+  attributedCampaignId String?
+  attributedVariantId  String?
+  attributionType      AttributionType?
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  conversion  ConversionEvent?
+
+  @@index([accountId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([type])
+  @@index([closeDate])
+}
+
+enum DealStatus {
+  PENDING
+  UNDER_CONTRACT
+  DUE_DILIGENCE
+  ASSIGNED      // Wholesale
+  CLOSED
+  FELL_THROUGH
+  CANCELLED
+}
+
+enum DealType {
+  WHOLESALE
+  FIX_AND_FLIP
+  BUY_AND_HOLD
+  TURNKEY
+  CREATIVE_FINANCE
+}
+
+enum DispoType {
+  WHOLESALE_ASSIGNMENT
+  RETAIL_SALE
+  RENTAL_HOLD
+  SOLD_TO_HEDGE_FUND
+  CREATIVE_EXIT
+}
+
+enum AttributionType {
+  FIRST_TOUCH
+  LAST_TOUCH
+  LINEAR
+  TIME_DECAY
+}
+
+// =============================================================================
+// SALES ENABLEMENT
+// =============================================================================
+
+model TalkTrack {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  name        String
+  type        TalkTrackType
+
+  // Script content
+  openingScript     String?
+  qualifyingQuestions Json @default("[]")
+  objectionHandlers   Json @default("{}") // { "price_too_low": "...", "not_selling": "..." }
+  closingScript       String?
+
+  // Renegotiation playbook
+  renegotiationTriggers Json @default("[]")
+  renegotiationScript   String?
+  maxDiscount           Decimal? @db.Decimal(5,4)
+
+  // For specific distress types
+  distressTypes   Json @default("[]") // Which distress types this is optimized for
+
+  isActive    Boolean @default(true)
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  calls       CallEvent[]
+
+  @@index([accountId])
+  @@index([type])
+}
+
+enum TalkTrackType {
+  INITIAL_CONTACT
+  FOLLOW_UP
+  RENEGOTIATION
+  PROBATE_SPECIALIST
+  PRE_FORECLOSURE_URGENT
+  LANDLORD_TIRED
+  CHECK_LETTER_DEFENSE
+}
+
+// =============================================================================
+// SEASONALITY & CASH CYCLE
+// =============================================================================
+
+model SeasonalityProfile {
+  id          String   @id @default(uuid())
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id])
+
+  year        Int
+
+  // Monthly performance indices (1.0 = average)
+  monthlyIndices Json // { "1": 0.85, "2": 0.90, ..., "12": 0.75 }
+
+  // Key patterns
+  peakMonths    Json @default("[]") // [4, 5, 6]
+  troughMonths  Json @default("[]") // [11, 12, 1]
+
+  // Special events
+  taxSeasonImpact    Decimal? @db.Decimal(5,4)
+  holidayImpact      Decimal? @db.Decimal(5,4)
+  stormSeasonImpact  Decimal? @db.Decimal(5,4) // For roofers
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([marketId, year])
+  @@index([marketId])
+}
+
+model CashCycleProfile {
+  id          String   @id @default(uuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  dealType    DealType
+
+  // Average cycle times (days)
+  avgSpendToLead      Int
+  avgLeadToContract   Int
+  avgContractToClose  Int
+  avgCloseToCase      Int
+
+  // Total cycle
+  avgTotalCycleDays   Int
+
+  // Variability
+  stdDevCycleDays     Int?
+
+  // Sample size
+  dealsAnalyzed       Int
+
+  // Time period
+  periodStart DateTime
+  periodEnd   DateTime
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([accountId, dealType, periodStart])
+  @@index([accountId])
+}
+
+// =============================================================================
+// DIAGNOSTICS & ANALYTICS
+// =============================================================================
+
+model DiagnosticSnapshot {
+  id          String   @id @default(uuid())
+
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+
+  // Can also be account-level
+  accountId   String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  snapshotType SnapshotType
+
+  // Time period being analyzed
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Comparison period (for "what changed" analysis)
+  comparisonPeriodStart DateTime?
+  comparisonPeriodEnd   DateTime?
+
+  // Metrics snapshot
+  metrics     Json     // All relevant metrics for this period
+
+  // Dimensional breakdowns
+  dimensionBreakdowns Json @default("{}") // By segment, by variant, by market, etc.
+
+  // Status
+  status      DiagnosticStatus @default(PENDING)
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+
+  // Relations
+  hypotheses  DiagnosticHypothesis[]
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([periodStart])
+}
+
+enum SnapshotType {
+  CAMPAIGN_PERFORMANCE
+  RESPONSE_CHANGE
+  TELEPHONY_HEALTH
+  LIST_COMPOSITION
+  OFFER_ANALYSIS
+  CREATIVE_FATIGUE
+  SEASONAL_COMPARISON
+}
+
+enum DiagnosticStatus {
+  PENDING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+model DiagnosticHypothesis {
+  id          String   @id @default(uuid())
+  snapshotId  String
+  snapshot    DiagnosticSnapshot @relation(fields: [snapshotId], references: [id])
+
+  // Hypothesis details
+  category    HypothesisCategory
+  title       String
+  description String
+
+  // Evidence
+  confidence  Decimal  @db.Decimal(5,4) // 0-1
+  impactScore Decimal  @db.Decimal(5,4) // 0-1, how much this explains the change
+
+  // Supporting metrics
+  supportingMetrics Json @default("[]")
+
+  // Recommended actions
+  recommendations Json @default("[]")
+
+  rank        Int      // Ordered by impact
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+
+  @@index([snapshotId])
+  @@index([category])
+  @@index([rank])
+}
+
+enum HypothesisCategory {
+  LIST_SHIFT
+  OFFER_CHANGE
+  TELEPHONY_ISSUE
+  CREATIVE_FATIGUE
+  SEASONAL_PATTERN
+  MARKET_CONDITION
+  DELIVERY_ISSUE
+  COMPETITIVE_PRESSURE
+}
+
+// =============================================================================
+// TRIGGERS & AUTOMATION
+// =============================================================================
+
+model TriggerRule {
+  id          String   @id @default(uuid())
+  accountId   String
+
+  name        String
+  description String?
+
+  // Trigger condition
+  triggerType   TriggerType
+  conditions    Json     // Complex condition definition
+  // Example: {
+  //   eventType: "NEW_DISTRESS_FLAG",
+  //   distressTypes: ["PRE_FORECLOSURE"],
+  //   markets: ["market-uuid"],
+  //   priceBands: ["BAND_100_200K"]
+  // }
+
+  // Action
+  actionType    TriggerActionType
+  actionConfig  Json     // Action configuration
+  // Example: {
+  //   campaignId: "campaign-uuid",
+  //   stepNumber: 1,
+  //   maxLatencyHours: 72
+  // }
+
+  // Timing constraints
+  maxLatencyHours Int?
+  cooldownDays    Int?   // Don't re-trigger for same property within N days
+
+  // Status
+  isActive    Boolean  @default(true)
+
+  // Stats
+  totalTriggered   Int @default(0)
+  lastTriggeredAt  DateTime?
+
+  isSynthetic Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  executions  TriggerExecution[]
+
+  @@index([accountId])
+  @@index([triggerType])
+  @@index([isActive])
+}
+
+enum TriggerType {
+  NEW_DISTRESS_FLAG
+  DISTRESS_ESCALATION
+  PROPERTY_ENTERED_MARKET
+  DOM_THRESHOLD_EXCEEDED
+  PRICE_DROP
+  MAIL_DELIVERED
+  NO_RESPONSE_AFTER_DAYS
+  CALL_OUTCOME
+}
+
+enum TriggerActionType {
+  ADD_TO_CAMPAIGN
+  SEND_MAIL_PIECE
+  CREATE_TASK
+  SEND_WEBHOOK
+  UPDATE_SEGMENT
+}
+
+model TriggerExecution {
+  id          String   @id @default(uuid())
+  ruleId      String
+  rule        TriggerRule @relation(fields: [ruleId], references: [id])
+
+  // What triggered it
+  triggerEventType String
+  triggerEventData Json
+
+  // Execution
+  status      TriggerExecutionStatus
+  executedAt  DateTime @default(now())
+
+  // Result
+  resultData  Json?
+  errorMessage String?
+
+  // Latency tracking
+  eventTimestamp DateTime
+  latencyMs      Int?
+
+  isSynthetic Boolean @default(false)
+
+  @@index([ruleId])
+  @@index([status])
+  @@index([executedAt])
+}
+
+enum TriggerExecutionStatus {
+  PENDING
+  EXECUTED
+  FAILED
+  SKIPPED
+}
+
+// =============================================================================
+// AUDIT & EVENTS
+// =============================================================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+
+  accountId   String?
+  userId      String?
+
+  entityType  String
+  entityId    String
+
+  action      String   // CREATE, UPDATE, DELETE, etc.
+
+  // Change data
+  previousData Json?
+  newData      Json?
+
+  // Context
+  ipAddress   String?
+  userAgent   String?
+
+  timestamp   DateTime @default(now())
+
+  isSynthetic Boolean @default(false)
+
+  @@index([accountId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+model SystemEvent {
+  id          String   @id @default(uuid())
+
+  eventType   String
+  eventData   Json
+
+  // Source
+  source      String   // Module or service that emitted
+
+  // Correlation
+  correlationId String?
+
+  timestamp   DateTime @default(now())
+
+  isSynthetic Boolean @default(false)
+
+  @@index([eventType])
+  @@index([source])
+  @@index([correlationId])
+  @@index([timestamp])
+}
