@@ -281,7 +281,7 @@ export class CampaignsService {
   async complete(id: string) {
     const campaign = await this.findOne(id);
 
-    if (![CampaignStatus.ACTIVE, CampaignStatus.PAUSED].includes(campaign.status)) {
+    if (campaign.status !== CampaignStatus.ACTIVE && campaign.status !== CampaignStatus.PAUSED) {
       throw new BadRequestException('Campaign must be active or paused to complete');
     }
 

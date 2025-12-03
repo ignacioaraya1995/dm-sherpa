@@ -225,7 +225,7 @@ export class PhoneHealthService {
         h.issues.map((issue, i) => ({
           phoneNumberId: h.phoneNumberId,
           number: h.number,
-          severity: h.overallHealth === 'critical' ? 'critical' : 'warning' as const,
+          severity: (h.overallHealth === 'critical' ? 'critical' : 'warning') as 'warning' | 'critical',
           issue,
           recommendation: h.recommendations[i] || 'Review manually',
         })),

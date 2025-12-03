@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DistressType, DistressSeverity, Prisma } from '@prisma/client';
+type JsonValue = Prisma.InputJsonValue;
 
 export interface DistressIngestionDto {
   propertyId: string;
@@ -68,7 +69,7 @@ export class DistressService {
             where: { id: existing.id },
             data: {
               severity: item.severity,
-              metadata: item.metadata || {},
+              metadata: (item.metadata || {}) as JsonValue,
               source: item.source,
               updatedAt: new Date(),
             },
@@ -82,7 +83,7 @@ export class DistressService {
               type: item.type,
               severity: item.severity,
               startDate: item.startDate,
-              metadata: item.metadata || {},
+              metadata: (item.metadata || {}) as JsonValue,
               source: item.source,
             },
           });

@@ -162,7 +162,7 @@ export class BatchesService {
   async send(id: string) {
     const batch = await this.findOne(id);
 
-    if (![BatchStatus.PENDING, BatchStatus.SCHEDULED].includes(batch.status)) {
+    if (batch.status !== BatchStatus.PENDING && batch.status !== BatchStatus.SCHEDULED) {
       throw new BadRequestException('Batch already sent or in progress');
     }
 
@@ -236,7 +236,7 @@ export class BatchesService {
   async cancel(id: string) {
     const batch = await this.findOne(id);
 
-    if ([BatchStatus.MAILED, BatchStatus.DELIVERED, BatchStatus.COMPLETED].includes(batch.status)) {
+    if (batch.status === BatchStatus.MAILED || batch.status === BatchStatus.DELIVERED || batch.status === BatchStatus.COMPLETED) {
       throw new BadRequestException('Cannot cancel a batch that has been mailed');
     }
 

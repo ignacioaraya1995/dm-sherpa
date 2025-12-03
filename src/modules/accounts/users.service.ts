@@ -4,6 +4,7 @@ import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { Prisma } from '@prisma/client';
 import { PaginationDto, PaginatedResponseDto } from '@/common/dto/pagination.dto';
 import { v4 as uuidv4 } from 'uuid';
+type JsonValue = Prisma.InputJsonValue;
 
 @Injectable()
 export class UsersService {
@@ -35,7 +36,7 @@ export class UsersService {
         role: dto.role,
         accountId: dto.accountId,
         isAiAgent: dto.isAiAgent || false,
-        settings: dto.settings || {},
+        settings: (dto.settings || {}) as JsonValue,
       },
       include: {
         account: {
@@ -136,7 +137,13 @@ export class UsersService {
 
     return this.prisma.user.update({
       where: { id },
-      data: dto,
+      data: {
+        email: dto.email,
+        name: dto.name,
+        role: dto.role,
+        isAiAgent: dto.isAiAgent,
+        settings: dto.settings ? (dto.settings as JsonValue) : undefined,
+      },
     });
   }
 

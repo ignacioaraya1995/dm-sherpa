@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { PaginationDto, PaginatedResponseDto } from '@/common/dto/pagination.dto';
-import { TriggerType, TriggerActionType, TriggerExecutionStatus, Prisma } from '@prisma/client';
+import { TriggerType, TriggerActionType, TriggerExecutionStatus, Prisma, BatchStatus, CampaignStatus } from '@prisma/client';
 
 export interface CreateTriggerRuleDto {
   accountId: string;
@@ -31,9 +31,9 @@ export class TriggersService {
         name: dto.name,
         description: dto.description,
         triggerType: dto.triggerType,
-        conditions: dto.conditions,
+        conditions: dto.conditions as Prisma.InputJsonValue,
         actionType: dto.actionType,
-        actionConfig: dto.actionConfig,
+        actionConfig: dto.actionConfig as Prisma.InputJsonValue,
         maxLatencyHours: dto.maxLatencyHours,
         cooldownDays: dto.cooldownDays,
       },
@@ -82,7 +82,16 @@ export class TriggersService {
     await this.findOne(id);
     return this.prisma.triggerRule.update({
       where: { id },
-      data: updates,
+      data: {
+        name: updates.name,
+        description: updates.description,
+        triggerType: updates.triggerType,
+        conditions: updates.conditions ? (updates.conditions as Prisma.InputJsonValue) : undefined,
+        actionType: updates.actionType,
+        actionConfig: updates.actionConfig ? (updates.actionConfig as Prisma.InputJsonValue) : undefined,
+        maxLatencyHours: updates.maxLatencyHours,
+        cooldownDays: updates.cooldownDays,
+      },
     });
   }
 
@@ -153,9 +162,9 @@ export class TriggersService {
       data: {
         ruleId,
         triggerEventType: eventType,
-        triggerEventData: eventData,
+        triggerEventData: eventData as Prisma.InputJsonValue,
         status,
-        resultData: result?.data,
+        resultData: result?.data ? (result.data as Prisma.InputJsonValue) : undefined,
         errorMessage: result?.error,
         eventTimestamp,
         latencyMs: Date.now() - eventTimestamp.getTime(),

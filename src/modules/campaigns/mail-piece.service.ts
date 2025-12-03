@@ -3,6 +3,7 @@ import { PrismaService } from '@/common/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaginationDto, PaginatedResponseDto } from '@/common/dto/pagination.dto';
 import { MailStatus, MailEventType, Prisma } from '@prisma/client';
+type JsonValue = Prisma.InputJsonValue;
 
 export interface CreateMailPieceDto {
   batchId: string;
@@ -168,7 +169,7 @@ export class MailPieceService {
         mailPieceId,
         eventType,
         location: metadata?.location,
-        metadata: metadata?.data || {},
+        metadata: (metadata?.data || {}) as JsonValue,
       },
     });
   }

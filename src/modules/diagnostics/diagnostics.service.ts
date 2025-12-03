@@ -1,16 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { HypothesisGeneratorService, Hypothesis } from './hypothesis-generator.service';
-
-export interface DiagnosticSnapshotDto {
-  id: string;
-  accountId: string;
-  periodStart: Date;
-  periodEnd: Date;
-  metrics: DiagnosticMetrics;
-  hypotheses: Hypothesis[];
-  createdAt: Date;
-}
+import type { Prisma } from '@prisma/client';
 
 export interface DiagnosticMetrics {
   mail: {
@@ -91,7 +82,10 @@ export class DiagnosticsService {
     const recommendations = this.generateRecommendations(changes, hypotheses);
 
     // Save snapshot
-    await this.createSnapshot(accountId, currentStart, currentEnd, currentMetrics, hypotheses);
+    const user = await this.prisma.user.findFirst({ where: { account: { id: accountId } } });
+    if (user) {
+      await this.createSnapshot(accountId, user.id, currentStart, currentEnd, currentMetrics, hypotheses);
+    }
 
     return {
       currentPeriod: { start: currentStart, end: currentEnd },
@@ -109,31 +103,21 @@ export class DiagnosticsService {
     startDate: Date,
     endDate: Date,
   ): Promise<DiagnosticMetrics> {
-    const [campaigns, deals] = await Promise.all([
-      this.prisma.campaign.aggregate({
-        where: {
-          accountId,
-          createdAt: { gte: startDate, lte: endDate },
-        },
-        _sum: {
-          totalMailed: true,
-          totalDelivered: true,
-          totalCalls: true,
-          totalQualifiedLeads: true,
-          totalContracts: true,
-          spentBudget: true,
-          grossProfit: true,
-        },
-      }),
-      this.prisma.deal.aggregate({
-        where: {
-          accountId,
-          contractDate: { gte: startDate, lte: endDate },
-        },
-        _count: true,
-        _sum: { grossProfit: true },
-      }),
-    ]);
+    const campaigns = await this.prisma.campaign.aggregate({
+      where: {
+        accountId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _sum: {
+        totalMailed: true,
+        totalDelivered: true,
+        totalCalls: true,
+        totalQualifiedLeads: true,
+        totalContracts: true,
+        spentBudget: true,
+        grossProfit: true,
+      },
+    });
 
     const closedDeals = await this.prisma.deal.count({
       where: {
@@ -143,13 +127,21 @@ export class DiagnosticsService {
       },
     });
 
+    const dealsGrossProfit = await this.prisma.deal.aggregate({
+      where: {
+        accountId,
+        closeDate: { gte: startDate, lte: endDate },
+      },
+      _sum: { grossProfit: true },
+    });
+
     const totalMailed = campaigns._sum.totalMailed || 0;
     const totalDelivered = campaigns._sum.totalDelivered || 0;
     const totalCalls = campaigns._sum.totalCalls || 0;
     const qualifiedLeads = campaigns._sum.totalQualifiedLeads || 0;
     const contracts = campaigns._sum.totalContracts || 0;
     const totalSpend = Number(campaigns._sum.spentBudget) || 0;
-    const grossProfit = Number(deals._sum.grossProfit) || 0;
+    const grossProfit = Number(dealsGrossProfit._sum.grossProfit) || 0;
 
     return {
       mail: {
@@ -222,7 +214,6 @@ export class DiagnosticsService {
   private generateRecommendations(changes: MetricChange[], hypotheses: Hypothesis[]): string[] {
     const recommendations: string[] = [];
 
-    // Based on significant changes
     const significantChanges = changes.filter(c => c.significance === 'high');
 
     for (const change of significantChanges) {
@@ -237,11 +228,10 @@ export class DiagnosticsService {
       }
     }
 
-    // Based on hypotheses
     for (const hypothesis of hypotheses.filter(h => h.confidence >= 0.7)) {
       switch (hypothesis.category) {
         case 'TELEPHONY_ISSUE':
-          recommendations.push(`Address telephony issues: ${hypothesis.suggestedAction}`);
+          recommendations.push(`Address telephony issues: ${hypothesis.recommendations[0] || 'Review phone health'}`);
           break;
         case 'CREATIVE_FATIGUE':
           recommendations.push('Rotate creative variants - current designs may be fatigued');
@@ -258,37 +248,38 @@ export class DiagnosticsService {
       }
     }
 
-    return [...new Set(recommendations)]; // Deduplicate
+    return [...new Set(recommendations)];
   }
 
   async createSnapshot(
     accountId: string,
+    createdById: string,
     periodStart: Date,
     periodEnd: Date,
     metrics: DiagnosticMetrics,
     hypotheses: Hypothesis[],
-  ): Promise<DiagnosticSnapshotDto> {
+  ) {
     const snapshot = await this.prisma.diagnosticSnapshot.create({
       data: {
         accountId,
+        createdById,
+        snapshotType: 'RESPONSE_CHANGE',
         periodStart,
         periodEnd,
-        responseRate: metrics.response.responseRate,
-        contractRate: metrics.conversion.contractRate,
-        closeRate: metrics.conversion.closeRate,
-        roi: metrics.financial.roi,
-        avgDaysToClose: 0, // Would calculate from deals
-        totalSpend: metrics.financial.totalSpend,
-        grossProfit: metrics.financial.grossProfit,
+        metrics: metrics as unknown as Prisma.InputJsonValue,
+        dimensionBreakdowns: {},
+        status: 'COMPLETED',
+        completedAt: new Date(),
         hypotheses: {
-          create: hypotheses.map(h => ({
+          create: hypotheses.map((h, index) => ({
             category: h.category,
             title: h.title,
             description: h.description,
             confidence: h.confidence,
-            impact: h.impact,
-            suggestedAction: h.suggestedAction,
-            evidenceData: h.evidence as object,
+            impactScore: h.impactScore,
+            supportingMetrics: h.supportingMetrics as Prisma.InputJsonValue,
+            recommendations: h.recommendations,
+            rank: index + 1,
           })),
         },
       },
@@ -297,21 +288,10 @@ export class DiagnosticsService {
       },
     });
 
-    return {
-      id: snapshot.id,
-      accountId: snapshot.accountId,
-      periodStart: snapshot.periodStart,
-      periodEnd: snapshot.periodEnd,
-      metrics,
-      hypotheses,
-      createdAt: snapshot.createdAt,
-    };
+    return snapshot;
   }
 
-  async getSnapshots(
-    accountId: string,
-    limit: number = 10,
-  ): Promise<DiagnosticSnapshotDto[]> {
+  async getSnapshots(accountId: string, limit: number = 10) {
     const snapshots = await this.prisma.diagnosticSnapshot.findMany({
       where: { accountId },
       include: { hypotheses: true },
@@ -319,136 +299,70 @@ export class DiagnosticsService {
       take: limit,
     });
 
-    return snapshots.map(s => ({
-      id: s.id,
-      accountId: s.accountId,
-      periodStart: s.periodStart,
-      periodEnd: s.periodEnd,
-      metrics: {
-        mail: {
-          totalMailed: 0,
-          deliveryRate: 0,
-          avgCostPerPiece: 0,
-        },
-        response: {
-          totalCalls: 0,
-          responseRate: Number(s.responseRate),
-          qualifiedRate: 0,
-        },
-        conversion: {
-          contracts: 0,
-          contractRate: Number(s.contractRate),
-          closeRate: Number(s.closeRate),
-        },
-        financial: {
-          totalSpend: Number(s.totalSpend),
-          grossProfit: Number(s.grossProfit),
-          roi: Number(s.roi),
-          costPerContract: 0,
-        },
-      },
-      hypotheses: s.hypotheses.map(h => ({
-        category: h.category as Hypothesis['category'],
-        title: h.title,
-        description: h.description,
-        confidence: h.confidence,
-        impact: h.impact as Hypothesis['impact'],
-        suggestedAction: h.suggestedAction || '',
-        evidence: (h.evidenceData as Record<string, unknown>) || {},
-      })),
-      createdAt: s.createdAt,
-    }));
+    return snapshots;
   }
 
   async compareMarkets(accountId: string, startDate: Date, endDate: Date) {
-    const marketStats = await this.prisma.$queryRaw<Array<{
-      market_id: string;
-      market_name: string;
-      total_mailed: bigint;
-      total_calls: bigint;
-      contracts: bigint;
-      response_rate: number;
-      contract_rate: number;
-    }>>`
-      SELECT
-        m.id as market_id,
-        m.name as market_name,
-        COALESCE(SUM(c."totalMailed"), 0) as total_mailed,
-        COALESCE(SUM(c."totalCalls"), 0) as total_calls,
-        COALESCE(SUM(c."totalContracts"), 0) as contracts,
-        CASE WHEN SUM(c."totalDelivered") > 0
-          THEN SUM(c."totalCalls")::float / SUM(c."totalDelivered")
-          ELSE 0 END as response_rate,
-        CASE WHEN SUM(c."totalDelivered") > 0
-          THEN SUM(c."totalContracts")::float / SUM(c."totalDelivered")
-          ELSE 0 END as contract_rate
-      FROM "Market" m
-      LEFT JOIN "Campaign" c ON c."marketId" = m.id
-        AND c."createdAt" >= ${startDate}
-        AND c."createdAt" <= ${endDate}
-      WHERE m."accountId" = ${accountId}
-      GROUP BY m.id, m.name
-      ORDER BY contract_rate DESC
-    `;
+    const accountMarkets = await this.prisma.accountMarket.findMany({
+      where: { accountId, isActive: true },
+      include: { market: true },
+    });
 
-    return marketStats.map(m => ({
-      marketId: m.market_id,
-      marketName: m.market_name,
-      totalMailed: Number(m.total_mailed),
-      totalCalls: Number(m.total_calls),
-      contracts: Number(m.contracts),
-      responseRate: m.response_rate,
-      contractRate: m.contract_rate,
-    }));
+    const results = await Promise.all(
+      accountMarkets.map(async (am) => {
+        const campaigns = await this.prisma.campaign.aggregate({
+          where: {
+            accountId,
+            createdAt: { gte: startDate, lte: endDate },
+          },
+          _sum: {
+            totalMailed: true,
+            totalCalls: true,
+            totalContracts: true,
+            totalDelivered: true,
+          },
+        });
+
+        const totalMailed = campaigns._sum.totalMailed || 0;
+        const totalDelivered = campaigns._sum.totalDelivered || 0;
+        const totalCalls = campaigns._sum.totalCalls || 0;
+        const contracts = campaigns._sum.totalContracts || 0;
+
+        return {
+          marketId: am.market.id,
+          marketName: am.market.name,
+          totalMailed,
+          totalCalls,
+          contracts,
+          responseRate: totalDelivered > 0 ? totalCalls / totalDelivered : 0,
+          contractRate: totalDelivered > 0 ? contracts / totalDelivered : 0,
+        };
+      }),
+    );
+
+    return results.sort((a, b) => b.contractRate - a.contractRate);
   }
 
   async compareVariants(accountId: string, startDate: Date, endDate: Date) {
-    const variantStats = await this.prisma.$queryRaw<Array<{
-      variant_id: string;
-      variant_name: string;
-      campaign_name: string;
-      pieces_mailed: number;
-      calls: bigint;
-      contracts: bigint;
-      response_rate: number;
-      contract_rate: number;
-    }>>`
-      SELECT
-        v.id as variant_id,
-        v.name as variant_name,
-        c.name as campaign_name,
-        v."piecesMailed" as pieces_mailed,
-        COUNT(DISTINCT ce.id) FILTER (WHERE ce."eventType" = 'INBOUND_CALL') as calls,
-        COUNT(DISTINCT d.id) as contracts,
-        CASE WHEN v."piecesMailed" > 0
-          THEN COUNT(DISTINCT ce.id) FILTER (WHERE ce."eventType" = 'INBOUND_CALL')::float / v."piecesMailed"
-          ELSE 0 END as response_rate,
-        CASE WHEN v."piecesMailed" > 0
-          THEN COUNT(DISTINCT d.id)::float / v."piecesMailed"
-          ELSE 0 END as contract_rate
-      FROM "Variant" v
-      JOIN "Campaign" c ON v."campaignId" = c.id
-      LEFT JOIN "MailPiece" mp ON mp."variantId" = v.id
-      LEFT JOIN "CallEvent" ce ON ce."mailPieceId" = mp.id
-      LEFT JOIN "Deal" d ON d."attributedVariantId" = v.id
-        AND d."contractDate" >= ${startDate}
-        AND d."contractDate" <= ${endDate}
-      WHERE c."accountId" = ${accountId}
-        AND c."createdAt" >= ${startDate}
-        AND c."createdAt" <= ${endDate}
-      GROUP BY v.id, v.name, c.name, v."piecesMailed"
-      ORDER BY contract_rate DESC
-    `;
+    const variants = await this.prisma.variant.findMany({
+      where: {
+        campaign: {
+          accountId,
+          createdAt: { gte: startDate, lte: endDate },
+        },
+      },
+      include: { campaign: true },
+    });
 
-    return variantStats.map(v => ({
-      variantId: v.variant_id,
-      variantName: v.variant_name,
-      campaignName: v.campaign_name,
-      piecesMailed: v.pieces_mailed,
-      calls: Number(v.calls),
-      contracts: Number(v.contracts),
-      responseRate: v.response_rate,
-      contractRate: v.contract_rate,
-    }));
+    return variants.map((v) => ({
+      variantId: v.id,
+      variantName: v.name,
+      campaignName: v.campaign.name,
+      piecesMailed: v.piecesMailed,
+      calls: v.calls,
+      contracts: v.contracts,
+      responseRate: v.piecesDelivered > 0 ? v.calls / v.piecesDelivered : 0,
+      contractRate: v.piecesDelivered > 0 ? v.contracts / v.piecesDelivered : 0,
+    })).sort((a, b) => b.contractRate - a.contractRate);
   }
 }
