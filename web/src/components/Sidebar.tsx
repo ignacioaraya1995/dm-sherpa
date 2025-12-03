@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   Calendar,
   Palette,
+  Layers,
+  Brush,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -37,8 +39,15 @@ const navigation = [
     items: [
       { name: 'All Campaigns', href: '/campaigns', icon: Send },
       { name: 'A/B Testing', href: '/testing', icon: TestTube },
-      { name: 'Creative Library', href: '/creative', icon: Palette },
       { name: 'Triggers', href: '/triggers', icon: Zap },
+    ],
+  },
+  {
+    label: 'Creative',
+    items: [
+      { name: 'Template Library', href: '/creative', icon: Palette },
+      { name: 'Campaign Sequences', href: '/creative/campaigns', icon: Layers },
+      { name: 'Brand Manager', href: '/creative/brands', icon: Brush },
     ],
   },
   {
@@ -100,7 +109,8 @@ export function Sidebar() {
             </div>
             <ul className="space-y-1">
               {group.items.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href ||
+                  (item.href !== '/' && pathname.startsWith(item.href + '/'));
                 const Icon = item.icon;
                 return (
                   <li key={item.name}>
