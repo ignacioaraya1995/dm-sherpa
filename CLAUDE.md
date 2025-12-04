@@ -802,6 +802,127 @@ TriggerActionType: ADD_TO_CAMPAIGN, SEND_MAIL_PIECE, CREATE_TASK, SEND_WEBHOOK, 
 
 ---
 
+## External API Integration: Lob (Print & Mail)
+
+Lob is the print vendor API used for sending physical mail pieces.
+
+### Authentication
+
+Lob uses **HTTP Basic Authentication** over HTTPS:
+- **Username:** Your API key
+- **Password:** Empty string
+
+```
+Authorization: Basic <base64(api_key + ":")>
+```
+
+**Base URL:** `https://api.lob.com/v1/`
+
+### API Keys
+
+Manage keys in Lob Dashboard → Settings → API Keys.
+
+| Key Type | Prefix | Usage |
+|----------|--------|-------|
+| Test Secret | `test_...` | Development, no real mail sent |
+| Live Secret | `live_...` | Production, real mail & billing |
+| Test Publishable | `test_pub_...` | Client-side address verification (test) |
+| Live Publishable | `live_pub_...` | Client-side address verification (prod) |
+
+### Key Types
+
+**Secret Keys:**
+- Full API access (create postcards, letters, checks)
+- Backend-only, never expose to clients
+- Store in environment variables or secret managers
+
+**Publishable Keys:**
+- Limited to address verification & autocomplete
+- Safe for client-side (browser/mobile)
+- Cannot trigger print & mail
+
+### Example Request
+
+```bash
+# Using test secret key (replace with your actual key)
+curl https://api.lob.com/v1/addresses \
+  -u test_YOUR_API_KEY_HERE:
+
+# The trailing colon indicates empty password
+```
+
+### Environment Configuration
+
+```env
+# .env
+LOB_API_KEY=test_XXXXXXXXXXXXXXXXXXXX      # Test environment
+# LOB_API_KEY=live_XXXXXXXXXXXXXXXXXXXX    # Production (uncomment when ready)
+LOB_PUBLISHABLE_KEY=test_pub_XXXXXXXXXXXX  # For address verification
+```
+
+### Integration Pattern
+
+```typescript
+// Backend service
+import axios from 'axios';
+
+const lobClient = axios.create({
+  baseURL: 'https://api.lob.com/v1',
+  auth: {
+    username: process.env.LOB_API_KEY,
+    password: ''  // Empty password for Basic Auth
+  }
+});
+
+// Create a postcard
+const response = await lobClient.post('/postcards', {
+  description: 'Campaign mail piece',
+  to: {
+    name: 'John Doe',
+    address_line1: '123 Main St',
+    address_city: 'San Francisco',
+    address_state: 'CA',
+    address_zip: '94107'
+  },
+  from: {
+    name: 'Apex Property Solutions',
+    address_line1: '456 Business Ave',
+    address_city: 'Austin',
+    address_state: 'TX',
+    address_zip: '78701'
+  },
+  front: '<html>...</html>',
+  back: '<html>...</html>'
+});
+```
+
+### Error Handling
+
+| Status | Meaning |
+|--------|---------|
+| 401 Unauthorized | Missing, invalid, or malformed API key |
+| 422 Unprocessable | Invalid request data (address issues, etc.) |
+
+### Security Best Practices
+
+1. **Never commit API keys** to version control
+2. **Use test keys** for development (no charges, no real mail)
+3. **Store secret keys** in environment variables or secret managers
+4. **Rotate keys** immediately if exposed
+5. **Use publishable keys** only for client-side address verification
+
+### Mapping to Schema
+
+| Lob Concept | DM Sherpa Table |
+|-------------|-----------------|
+| Postcard/Letter | MailPiece |
+| Mail tracking events | MailEvent |
+| Address verification | Property address fields |
+| Job ID | Batch.printJobId |
+| Mail status | MailPiece.status |
+
+---
+
 ## Recent Schema Changes (v2.0)
 
 1. **Added Buyer table** - Proper buyer/investor tracking with criteria and performance
