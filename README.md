@@ -168,7 +168,7 @@ npm run db:reset
 ```
 dm-sherpa/
 ├── prisma/
-│   ├── schema.prisma      # Database schema (40+ models)
+│   ├── schema.prisma      # Database schema (40 models)
 │   └── seed.ts            # Synthetic data seeder
 ├── src/
 │   ├── common/
@@ -194,6 +194,7 @@ dm-sherpa/
 │   │   └── triggers/      # Automation rules
 │   ├── app.module.ts      # Root module
 │   └── main.ts            # Application entry
+├── CLAUDE.md              # Database schema documentation
 ├── package.json
 └── tsconfig.json
 ```
