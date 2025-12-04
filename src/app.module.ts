@@ -9,20 +9,14 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthModule } from './common/health/health.module';
 
-// Feature modules
+// Feature modules - Core Direct Mail Platform
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { MarketsModule } from './modules/markets/markets.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { SegmentsModule } from './modules/segments/segments.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
-import { ExperimentsModule } from './modules/experiments/experiments.module';
-import { TelephonyModule } from './modules/telephony/telephony.module';
 import { OffersModule } from './modules/offers/offers.module';
-import { SalesModule } from './modules/sales/sales.module';
-import { DealsModule } from './modules/deals/deals.module';
-import { DiagnosticsModule } from './modules/diagnostics/diagnostics.module';
-import { TriggersModule } from './modules/triggers/triggers.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { RecommendationsModule } from './modules/recommendations/recommendations.module';
 
 // Configuration
 import configuration from './config/configuration';
@@ -79,20 +73,14 @@ import { validate } from './config/env.validation';
     PrismaModule,
     HealthModule,
 
-    // Features
-    AccountsModule,
-    MarketsModule,
-    PropertiesModule,
-    SegmentsModule,
-    CampaignsModule,
-    ExperimentsModule,
-    TelephonyModule,
-    OffersModule,
-    SalesModule,
-    DealsModule,
-    DiagnosticsModule,
-    TriggersModule,
-    AnalyticsModule,
+    // Features - Direct Mail Management & Recommendations
+    AccountsModule,      // Account & user management
+    MarketsModule,       // Geographic targeting
+    PropertiesModule,    // Property & owner data
+    SegmentsModule,      // Audience segmentation (WHO)
+    CampaignsModule,     // Campaign orchestration (HOW)
+    OffersModule,        // Offer strategies (WHAT)
+    RecommendationsModule, // AI-powered recommendations
   ],
 })
 export class AppModule {}

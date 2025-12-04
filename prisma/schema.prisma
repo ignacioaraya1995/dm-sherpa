@@ -1,5 +1,5 @@
-// Direct Mail Performance OS - Prisma Schema
-// For Real Estate & Home Services (Wholesalers, Flippers, Roofers, etc.)
+// Direct Mail Platform - Simplified Prisma Schema
+// Focused on: Direct Mail Management & Campaign Recommendations
 
 generator client {
   provider = "prisma-client-js"
@@ -22,28 +22,19 @@ model Account {
   settings Json          @default("{}")
 
   // Synthetic/demo account flag
-  // When true, this is a demo account and ALL related data should be considered synthetic
-  // This is the PRIMARY flag - child entities inherit this status
   isSynthetic Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  users               User[]
-  markets             AccountMarket[]
-  campaigns           Campaign[]
-  segments            Segment[]
-  phoneNumbers        PhoneNumber[]
-  offerStrategies     OfferStrategy[]
-  designTemplates     DesignTemplate[]
-  deals               Deal[]
-  talkTracks          TalkTrack[]
-  triggerRules        TriggerRule[]
-  buyers              Buyer[]
-  tasks               Task[]
-  diagnosticSnapshots DiagnosticSnapshot[]
-  cashCycleProfiles   CashCycleProfile[] // Cached analytics
+  users           User[]
+  markets         AccountMarket[]
+  campaigns       Campaign[]
+  segments        Segment[]
+  offerStrategies OfferStrategy[]
+  designTemplates DesignTemplate[]
+  recommendations Recommendation[]
 
   @@index([type])
   @@index([status])
@@ -85,11 +76,7 @@ model User {
   lastLoginAt DateTime?
 
   // Relations
-  createdCampaigns    Campaign[]           @relation("CampaignCreator")
-  assignedCalls       CallEvent[]          @relation("CallAssignee")
-  createdDeals        Deal[]               @relation("DealCreator")
-  diagnosticSnapshots DiagnosticSnapshot[]
-  assignedTasks       Task[]
+  createdCampaigns Campaign[] @relation("CampaignCreator")
 
   @@index([accountId])
   @@index([role])
@@ -128,12 +115,10 @@ model Market {
   updatedAt DateTime @updatedAt
 
   // Relations
-  accounts            AccountMarket[]
-  zipCodes            ZipCode[]
-  properties          Property[]
-  seasonalityProfiles SeasonalityProfile[]
-  dispoData           MarketDispoData[]
-  phoneAssignments    PhoneNumberAssignment[]
+  accounts   AccountMarket[]
+  zipCodes   ZipCode[]
+  properties Property[]
+  dispoData  MarketDispoData[]
 
   @@unique([state, county])
   @@index([state])
@@ -224,9 +209,6 @@ model Property {
   conditionScore   Decimal?  @db.Decimal(3, 2) // 0-10 scale
   roofAge          Int?
 
-  // NOTE: isVacant removed - use DistressFlag with type=VACANT instead
-  // NOTE: isAbsenteeOwner removed - use Owner.isAbsentee instead
-
   // Primary owner (shortcut for common case)
   primaryOwnerId String?
   primaryOwner   Owner?  @relation(fields: [primaryOwnerId], references: [id])
@@ -245,9 +227,7 @@ model Property {
   flags            PropertyFlag[] // Distress, motivation, and condition flags
   segmentMembers   SegmentMember[]
   mailPieces       MailPiece[]
-  deals            Deal[]
   valuationHistory PropertyValuationHistory[]
-  tasks            Task[]
 
   @@index([marketId])
   @@index([zipCodeId])
@@ -302,7 +282,6 @@ model PropertyValuationHistory {
   // When this valuation was recorded
   valuationDate DateTime
 
-  // For valuations, isSynthetic indicates estimated/derived values vs actual appraisals
   isSynthetic Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -327,7 +306,6 @@ model Owner {
   // Owner info
   firstName String
   lastName  String
-  // NOTE: fullName removed - compute as firstName + ' ' + lastName
 
   // Mailing address
   mailingStreet String?
@@ -399,7 +377,7 @@ enum OwnershipType {
 }
 
 // =============================================================================
-// DISTRESS DATA
+// PROPERTY FLAGS (Unified System)
 // =============================================================================
 
 // Unified property flag model - supports distress, motivation, and condition flags
@@ -425,12 +403,6 @@ model PropertyFlag {
 
   // Type-specific data
   metadata Json @default("{}")
-  // Examples:
-  // Pre-foreclosure: { auctionDate, defaultAmount, lender }
-  // Tax lien: { amount, yearsDelinquent }
-  // Probate: { decedentName, caseNumber }
-  // Code violation: { violationType, fineAmount }
-  // Roof damage: { estimatedCost, damageDate }
 
   source String? // Data source
 
@@ -478,7 +450,6 @@ enum DistressType {
 }
 
 // Motivation indicators - characteristics that may indicate seller motivation
-// These are NOT distress, but can indicate opportunity
 enum MotivationIndicator {
   VACANT // Property appears unoccupied
   ABSENTEE_OWNER // Owner lives elsewhere
@@ -499,8 +470,6 @@ enum PropertyConditionFlag {
   DEFERRED_MAINTENANCE
   MAJOR_REPAIRS_NEEDED
 }
-
-// NOTE: DistressSeverity removed - use FlagSeverity instead
 
 // =============================================================================
 // DISPOSITION (DISPO) DATA
@@ -559,22 +528,14 @@ model Segment {
   description String?
 
   // Filter definition (JSON-based query)
-  filters Json // Complex filter structure
-  // Example: {
-  //   distressTypes: ["PRE_FORECLOSURE", "TAX_LIEN"],
-  //   priceBands: ["BAND_100_200K", "BAND_200_300K"],
-  //   minEquityPercent: 30,
-  //   isAbsentee: true,
-  //   minDispoScore: 0.7,
-  //   markets: ["market-uuid-1", "market-uuid-2"]
-  // }
+  filters Json
 
   // Computed stats (refreshed periodically)
   memberCount      Int      @default(0)
   avgFreshnessDays Decimal? @db.Decimal(5, 1)
   avgDispoScore    Decimal? @db.Decimal(5, 4)
   avgMotivation    Decimal? @db.Decimal(5, 4)
-  distressMix      Json     @default("{}") // { PRE_FORECLOSURE: 0.3, TAX_LIEN: 0.4, ... }
+  distressMix      Json     @default("{}")
 
   // Targeting rules
   maxMailsPerProperty Int     @default(6)
@@ -646,22 +607,18 @@ model Campaign {
   isMultiTouch Boolean @default(true)
   touchCount   Int     @default(3)
 
-  // Experiment settings
-  isExperiment        Boolean         @default(false)
-  experimentType      ExperimentType?
-  baselineResponse    Decimal?        @db.Decimal(5, 4)
-  minDetectableEffect Decimal?        @db.Decimal(5, 4)
-  confidenceLevel     Decimal?        @db.Decimal(3, 2) // e.g., 0.95
+  // A/B Testing (simplified from experiments module)
+  isExperiment        Boolean  @default(false)
+  experimentType      String?  // A_B_TEST, MULTI_ARM_BANDIT
+  confidenceLevel     Decimal? @db.Decimal(3, 2) // e.g., 0.95
 
   // Performance summary (computed)
   totalMailed         Int      @default(0)
   totalDelivered      Int      @default(0)
-  totalCalls          Int      @default(0)
-  totalQualifiedLeads Int      @default(0)
-  totalContracts      Int      @default(0)
+  totalResponses      Int      @default(0)
   responseRate        Decimal? @db.Decimal(5, 4)
-  contractRate        Decimal? @db.Decimal(5, 4)
-  grossProfit         Decimal  @default(0) @db.Decimal(12, 2)
+  costPerResponse     Decimal? @db.Decimal(10, 2)
+  estimatedRevenue    Decimal? @db.Decimal(12, 2)
   roi                 Decimal? @db.Decimal(8, 4)
 
   isSynthetic Boolean @default(false)
@@ -672,13 +629,10 @@ model Campaign {
   completedAt DateTime?
 
   // Relations
-  segments            CampaignSegment[]
-  variants            Variant[]
-  batches             Batch[]
-  steps               CampaignStep[]
-  diagnosticSnapshots DiagnosticSnapshot[]
-  phoneAssignments    PhoneNumberAssignment[]
-  attributedDeals     Deal[]                  @relation("DealAttribution")
+  segments CampaignSegment[]
+  variants Variant[]
+  batches  Batch[]
+  steps    CampaignStep[]
 
   @@index([accountId])
   @@index([status])
@@ -710,12 +664,6 @@ enum CampaignStatus {
   PAUSED
   COMPLETED
   CANCELLED
-}
-
-enum ExperimentType {
-  A_B_TEST
-  MULTI_ARM_BANDIT
-  SEQUENTIAL
 }
 
 model CampaignSegment {
@@ -785,17 +733,13 @@ model Variant {
   // Performance metrics
   piecesMailed    Int     @default(0)
   piecesDelivered Int     @default(0)
-  calls           Int     @default(0)
-  qualifiedCalls  Int     @default(0)
-  contracts       Int     @default(0)
-  grossProfit     Decimal @default(0) @db.Decimal(12, 2)
+  responses       Int     @default(0)
 
   // Computed rates
   responseRate   Decimal? @db.Decimal(5, 4)
-  contractRate   Decimal? @db.Decimal(5, 4)
-  profitPerPiece Decimal? @db.Decimal(8, 4)
+  costPerResponse Decimal? @db.Decimal(10, 2)
 
-  // Experiment results
+  // A/B Test results
   isControl          Boolean  @default(false)
   isWinner           Boolean?
   pValue             Decimal? @db.Decimal(8, 6)
@@ -809,10 +753,8 @@ model Variant {
   updatedAt DateTime @updatedAt
 
   // Relations
-  batches          BatchVariant[]
-  mailPieces       MailPiece[]
-  phoneAssignments PhoneNumberAssignment[]
-  attributedDeals  Deal[]                  @relation("DealAttribution")
+  batches    BatchVariant[]
+  mailPieces MailPiece[]
 
   @@index([campaignId])
   @@index([stepId])
@@ -839,10 +781,9 @@ model Batch {
 
   // Performance (aggregated from variants)
   totalDelivered Int @default(0)
-  totalCalls     Int @default(0)
-  totalContracts Int @default(0)
+  totalResponses Int @default(0)
 
-  // Print vendor info
+  // Print vendor info (Lob integration)
   printJobId  String?
   printStatus String?
 
@@ -1023,8 +964,7 @@ model MailPiece {
 
   // Tracking
   trackingNumber String?
-  phoneNumberId  String?
-  phoneNumber    PhoneNumber? @relation(fields: [phoneNumberId], references: [id])
+  lobId          String? // Lob API mail piece ID
 
   // Status
   status MailStatus @default(CREATED)
@@ -1034,6 +974,11 @@ model MailPiece {
   postageCost Decimal? @db.Decimal(8, 4)
   totalCost   Decimal? @db.Decimal(8, 4)
 
+  // Response tracking
+  hasResponded   Boolean   @default(false)
+  respondedAt    DateTime?
+  responseType   String?   // CALL, WEBSITE, QR_CODE, etc.
+
   isSynthetic Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -1041,14 +986,13 @@ model MailPiece {
 
   // Relations
   events MailEvent[]
-  calls  CallEvent[]
 
   @@index([batchId])
   @@index([variantId])
   @@index([propertyId])
   @@index([status])
-  @@index([phoneNumberId])
   @@index([createdAt])
+  @@index([hasResponded])
 }
 
 enum MailStatus {
@@ -1070,7 +1014,7 @@ model MailEvent {
   eventType MailEventType
   timestamp DateTime      @default(now())
 
-  // Location (if available from USPS)
+  // Location (if available from USPS/Lob)
   location String?
 
   // Additional data
@@ -1099,879 +1043,129 @@ enum MailEventType {
 }
 
 // =============================================================================
-// TELEPHONY
+// RECOMMENDATIONS (AI-Powered Campaign Suggestions)
 // =============================================================================
 
-model PhoneNumber {
+model Recommendation {
   id        String  @id @default(uuid())
   accountId String
   account   Account @relation(fields: [accountId], references: [id])
 
-  number String          @unique
-  type   PhoneNumberType
+  // Recommendation type
+  type RecommendationType
 
-  // Region assignment
-  region   String?
-  state    String?
-  areaCode String?
+  // What is being recommended
+  category RecommendationCategory
 
-  // Status & health
-  status             PhoneStatus @default(ACTIVE)
-  registrationStatus String? // CNAM, STIR/SHAKEN
-  spamScore          Decimal?    @db.Decimal(5, 4) // 0-1, lower is better
-  lastHealthCheck    DateTime?
+  // Recommendation details
+  title       String
+  description String
+  reasoning   String // Why this is recommended
 
-  // Expected performance baseline
-  expectedCallsPerThousand Decimal? @db.Decimal(6, 2)
+  // Confidence and priority
+  confidence Decimal @db.Decimal(5, 4) // 0-1
+  priority   RecommendationPriority
 
-  // Provider info
-  providerId  String?
-  providerSid String? // Twilio SID, etc.
+  // Specific recommendation data (varies by type)
+  data Json @default("{}")
+  // Examples:
+  // WHO: { segmentFilters: {...}, estimatedSize: 5000, avgMotivation: 0.75 }
+  // WHAT: { templateId: "...", offerStrategy: {...}, expectedLift: 0.15 }
+  // HOW: { touchCount: 3, timing: [0, 21, 42], budget: 10000 }
 
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  assignments PhoneNumberAssignment[]
-  mailPieces  MailPiece[]
-  calls       CallEvent[]
-  healthLogs  PhoneHealthLog[]
-
-  @@index([accountId])
-  @@index([status])
-  @@index([region])
-}
-
-enum PhoneNumberType {
-  LOCAL
-  TOLL_FREE
-  TRACKING
-}
-
-enum PhoneStatus {
-  ACTIVE
-  INACTIVE
-  SPAM_FLAGGED
-  BLOCKED
-  PENDING_REGISTRATION
-}
-
-model PhoneNumberAssignment {
-  id            String      @id @default(uuid())
-  phoneNumberId String
-  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
-
-  // What this number is assigned to (proper FK relationships)
-  campaignId String?
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
-  variantId  String?
-  variant    Variant?  @relation(fields: [variantId], references: [id])
-  marketId   String?
-  market     Market?   @relation(fields: [marketId], references: [id])
-
-  // Routing
-  routingType   RoutingType
-  routingTarget String // User ID, team ID, or IVR config
-
-  startDate DateTime  @default(now())
-  endDate   DateTime?
-
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([phoneNumberId])
-  @@index([campaignId])
-  @@index([variantId])
-  @@index([marketId])
-  @@index([isActive])
-}
-
-enum RoutingType {
-  DIRECT_TO_USER
-  ROUND_ROBIN_TEAM
-  IVR
-  EXTERNAL_FORWARD
-}
-
-model PhoneHealthLog {
-  id            String      @id @default(uuid())
-  phoneNumberId String
-  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
-
-  checkType HealthCheckType
-  timestamp DateTime        @default(now())
-
-  // Results
-  isHealthy       Boolean
-  spamScore       Decimal? @db.Decimal(5, 4)
-  testCallSuccess Boolean?
-  latencyMs       Int?
-
-  // Issues found
-  issues Json @default("[]")
-
-  isSynthetic Boolean @default(false)
-
-  @@index([phoneNumberId])
-  @@index([timestamp])
-}
-
-enum HealthCheckType {
-  AUTOMATED_TEST_CALL
-  SPAM_CHECK
-  REGISTRATION_CHECK
-  ROUTING_VALIDATION
-}
-
-// =============================================================================
-// CALLS & LEADS
-// =============================================================================
-
-model CallEvent {
-  id String @id @default(uuid())
-
-  // Source
-  phoneNumberId String
-  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id])
-  mailPieceId   String?
-  mailPiece     MailPiece?  @relation(fields: [mailPieceId], references: [id])
-
-  // Assignment
-  assigneeId String?
-  assignee   User?   @relation("CallAssignee", fields: [assigneeId], references: [id])
-
-  // Call details
-  callerNumber String?
-  callSid      String? // Provider call ID
-
-  // Timing
-  startTime    DateTime
-  endTime      DateTime?
-  duration     Int? // seconds
-  ringDuration Int? // seconds before answer
-
-  // Outcome
-  status  CallStatus
-  outcome CallOutcome?
-
-  // Talk track used
-  talkTrackId String?
-  talkTrack   TalkTrack? @relation(fields: [talkTrackId], references: [id])
-
-  // Lead qualification
-  isQualified        Boolean  @default(false)
-  qualificationScore Decimal? @db.Decimal(5, 4)
-
-  // Recording
-  recordingUrl  String?
-  transcriptUrl String?
-
-  // Notes
-  notes String?
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  conversion ConversionEvent?
-  tasks      Task[]
-
-  @@index([phoneNumberId])
-  @@index([mailPieceId])
-  @@index([assigneeId])
-  @@index([status])
-  @@index([outcome])
-  @@index([startTime])
-  @@index([isQualified])
-}
-
-enum CallStatus {
-  RINGING
-  IN_PROGRESS
-  COMPLETED
-  MISSED
-  VOICEMAIL
-  FAILED
-  BUSY
-}
-
-enum CallOutcome {
-  INTERESTED
-  NOT_INTERESTED
-  CALLBACK_REQUESTED
-  WRONG_NUMBER
-  NO_ANSWER
-  LEFT_VOICEMAIL
-  DO_NOT_CALL
-  APPOINTMENT_SET
-  CONTRACT_DISCUSSED
-}
-
-// =============================================================================
-// BUYERS & INVESTORS
-// =============================================================================
-
-model Buyer {
-  id        String  @id @default(uuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id])
-
-  // Buyer identification
-  name        String
-  companyName String?
-  email       String?
-  phone       String?
-
-  // Buyer type
-  type BuyerType
-
-  // Buyer criteria
-  targetMarkets       Json     @default("[]") // Array of market IDs
-  targetPriceBands    Json     @default("[]") // Array of price bands
-  targetPropertyTypes Json     @default("[]") // Array of property types
-  minDispoScore       Decimal? @db.Decimal(5, 4)
-
-  // Financial capacity
-  maxPurchasePrice   Decimal? @db.Decimal(12, 2)
-  avgCloseTime       Int? // Average days to close
-  proofOfFundsOnFile Boolean  @default(false)
-
-  // Performance tracking
-  totalDeals       Int      @default(0)
-  avgDaysToClose   Int?
-  reliabilityScore Decimal? @db.Decimal(5, 4) // 0-1, based on deal completion rate
+  // Expected impact
+  expectedImpact      Json @default("{}") // { responseRate: 0.025, estimatedROI: 2.5 }
+  estimatedBudget     Decimal? @db.Decimal(12, 2)
+  estimatedResponses  Int?
+  estimatedRevenue    Decimal? @db.Decimal(12, 2)
 
   // Status
-  isActive    Boolean @default(true)
-  isSynthetic Boolean @default(false)
+  status RecommendationStatus @default(PENDING)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // User action
+  actionTaken   String?   // APPLIED, DISMISSED, MODIFIED
+  actionTakenAt DateTime?
+  actionNotes   String?
 
-  // Relations
-  deals Deal[]
-
-  @@index([accountId])
-  @@index([type])
-  @@index([isActive])
-}
-
-enum BuyerType {
-  CASH_BUYER
-  FIX_AND_FLIPPER
-  BUY_AND_HOLD_INVESTOR
-  HEDGE_FUND
-  TURNKEY_OPERATOR
-  RETAIL_BUYER
-  WHOLESALER
-}
-
-// =============================================================================
-// CONVERSIONS & DEALS
-// =============================================================================
-
-model ConversionEvent {
-  id String @id @default(uuid())
-
-  callId String    @unique
-  call   CallEvent @relation(fields: [callId], references: [id])
-
-  type      ConversionType
-  timestamp DateTime       @default(now())
-
-  // Attribution
-  attributionWindow Int? // days from mail to conversion
-
-  // Deal link (if applicable)
-  dealId String? @unique
-  deal   Deal?   @relation(fields: [dealId], references: [id])
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([type])
-  @@index([timestamp])
-}
-
-enum ConversionType {
-  APPOINTMENT
-  OFFER_MADE
-  CONTRACT_SIGNED
-  DEAL_CLOSED
-}
-
-model Deal {
-  id          String   @id @default(uuid())
-  accountId   String
-  account     Account  @relation(fields: [accountId], references: [id])
-  createdById String
-  createdBy   User     @relation("DealCreator", fields: [createdById], references: [id])
-  propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id])
-
-  // Deal details
-  status DealStatus @default(PENDING)
-  type   DealType
-
-  // Pricing
-  mailedOffer     Decimal? @db.Decimal(12, 2)
-  negotiatedPrice Decimal? @db.Decimal(12, 2)
-  contractPrice   Decimal  @db.Decimal(12, 2)
-  arvAtContract   Decimal? @db.Decimal(12, 2)
-
-  // Spread calculation
-  assignmentFee Decimal? @db.Decimal(12, 2) // For wholesale
-  rehabBudget   Decimal? @db.Decimal(12, 2) // For flips
-  salePrice     Decimal? @db.Decimal(12, 2)
-  grossProfit   Decimal? @db.Decimal(12, 2)
-  netProfit     Decimal? @db.Decimal(12, 2)
-
-  // Dispo outcome
-  dispoType   DispoType?
-  daysToClose Int?
-  buyerId     String?
-  buyer       Buyer?     @relation(fields: [buyerId], references: [id])
-
-  // Timeline
-  contractDate     DateTime?
-  closeDate        DateTime?
-  cashReceivedDate DateTime?
-
-  // Attribution to mail (proper FK relationships)
-  attributedCampaignId String?
-  attributedCampaign   Campaign?        @relation("DealAttribution", fields: [attributedCampaignId], references: [id])
-  attributedVariantId  String?
-  attributedVariant    Variant?         @relation("DealAttribution", fields: [attributedVariantId], references: [id])
-  attributionType      AttributionType?
+  // If applied, link to resulting campaign
+  appliedCampaignId String?
 
   isSynthetic Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  expiresAt DateTime? // Recommendations can expire
 
   // Relations
-  conversion ConversionEvent?
-  tasks      Task[]
+  feedback RecommendationFeedback[]
 
   @@index([accountId])
-  @@index([propertyId])
+  @@index([type])
+  @@index([category])
   @@index([status])
-  @@index([type])
-  @@index([closeDate])
-  @@index([buyerId])
-  @@index([attributedCampaignId])
+  @@index([priority])
   @@index([createdAt])
 }
 
-enum DealStatus {
-  PENDING
-  UNDER_CONTRACT
-  DUE_DILIGENCE
-  ASSIGNED // Wholesale
-  CLOSED
-  FELL_THROUGH
-  CANCELLED
+enum RecommendationType {
+  PROACTIVE // System-generated based on data analysis
+  ON_DEMAND // User-requested recommendation
+  OPTIMIZATION // Improvement to existing campaign
 }
 
-enum DealType {
-  WHOLESALE
-  FIX_AND_FLIP
-  BUY_AND_HOLD
-  TURNKEY
-  CREATIVE_FINANCE
+enum RecommendationCategory {
+  WHO // Target audience recommendation
+  WHAT // Creative and offer recommendation
+  HOW // Campaign structure recommendation
+  TIMING // When to send recommendation
+  BUDGET // Budget allocation recommendation
 }
 
-enum DispoType {
-  WHOLESALE_ASSIGNMENT
-  RETAIL_SALE
-  RENTAL_HOLD
-  SOLD_TO_HEDGE_FUND
-  CREATIVE_EXIT
-}
-
-enum AttributionType {
-  FIRST_TOUCH
-  LAST_TOUCH
-  LINEAR
-  TIME_DECAY
-}
-
-// =============================================================================
-// SALES ENABLEMENT
-// =============================================================================
-
-model TalkTrack {
-  id        String  @id @default(uuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id])
-
-  name String
-  type TalkTrackType
-
-  // Script content
-  openingScript       String?
-  qualifyingQuestions Json    @default("[]")
-  objectionHandlers   Json    @default("{}") // { "price_too_low": "...", "not_selling": "..." }
-  closingScript       String?
-
-  // Renegotiation playbook
-  renegotiationTriggers Json     @default("[]")
-  renegotiationScript   String?
-  maxDiscount           Decimal? @db.Decimal(5, 4)
-
-  // For specific distress types
-  distressTypes Json @default("[]") // Which distress types this is optimized for
-
-  isActive    Boolean @default(true)
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  calls CallEvent[]
-
-  @@index([accountId])
-  @@index([type])
-}
-
-enum TalkTrackType {
-  INITIAL_CONTACT
-  FOLLOW_UP
-  RENEGOTIATION
-  PROBATE_SPECIALIST
-  PRE_FORECLOSURE_URGENT
-  LANDLORD_TIRED
-  CHECK_LETTER_DEFENSE
-}
-
-// =============================================================================
-// SEASONALITY & CASH CYCLE
-// =============================================================================
-
-// Cached analytics: Seasonal trends by market
-// NOTE: This data is derived from historical performance and cached for planning
-model SeasonalityProfile {
-  id       String @id @default(uuid())
-  marketId String
-  market   Market @relation(fields: [marketId], references: [id])
-
-  year Int
-
-  // Monthly performance indices (1.0 = average)
-  monthlyIndices Json // { "1": 0.85, "2": 0.90, ..., "12": 0.75 }
-
-  // Key patterns
-  peakMonths   Json @default("[]") // [4, 5, 6]
-  troughMonths Json @default("[]") // [11, 12, 1]
-
-  // Special events
-  taxSeasonImpact   Decimal? @db.Decimal(5, 4)
-  holidayImpact     Decimal? @db.Decimal(5, 4)
-  stormSeasonImpact Decimal? @db.Decimal(5, 4) // For roofers
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([marketId, year])
-  @@index([marketId])
-}
-
-// Cached analytics: Deal cycle timing by deal type
-// NOTE: This data could be computed from Deal records but is cached for performance
-model CashCycleProfile {
-  id        String  @id @default(uuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id])
-
-  dealType DealType
-
-  // Average cycle times (days)
-  avgSpendToLead     Int
-  avgLeadToContract  Int
-  avgContractToClose Int
-  avgCloseToCase     Int
-
-  // Total cycle
-  avgTotalCycleDays Int
-
-  // Variability
-  stdDevCycleDays Int?
-
-  // Sample size
-  dealsAnalyzed Int
-
-  // Time period
-  periodStart DateTime
-  periodEnd   DateTime
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([accountId, dealType, periodStart])
-  @@index([accountId])
-}
-
-// =============================================================================
-// DIAGNOSTICS & ANALYTICS
-// =============================================================================
-
-model DiagnosticSnapshot {
-  id String @id @default(uuid())
-
-  campaignId String?
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
-
-  // Can also be account-level
-  accountId String?
-  account   Account? @relation(fields: [accountId], references: [id])
-
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
-
-  snapshotType SnapshotType
-
-  // Time period being analyzed
-  periodStart DateTime
-  periodEnd   DateTime
-
-  // Comparison period (for "what changed" analysis)
-  comparisonPeriodStart DateTime?
-  comparisonPeriodEnd   DateTime?
-
-  // Metrics snapshot
-  metrics Json // All relevant metrics for this period
-
-  // Dimensional breakdowns
-  dimensionBreakdowns Json @default("{}") // By segment, by variant, by market, etc.
-
-  // Status
-  status DiagnosticStatus @default(PENDING)
-
-  isSynthetic Boolean @default(false)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  completedAt DateTime?
-
-  // Relations
-  hypotheses DiagnosticHypothesis[]
-
-  @@index([campaignId])
-  @@index([status])
-  @@index([periodStart])
-}
-
-enum SnapshotType {
-  CAMPAIGN_PERFORMANCE
-  RESPONSE_CHANGE
-  TELEPHONY_HEALTH
-  LIST_COMPOSITION
-  OFFER_ANALYSIS
-  CREATIVE_FATIGUE
-  SEASONAL_COMPARISON
-}
-
-enum DiagnosticStatus {
-  PENDING
-  ANALYZING
-  COMPLETED
-  FAILED
-}
-
-model DiagnosticHypothesis {
-  id         String             @id @default(uuid())
-  snapshotId String
-  snapshot   DiagnosticSnapshot @relation(fields: [snapshotId], references: [id])
-
-  // Hypothesis details
-  category    HypothesisCategory
-  title       String
-  description String
-
-  // Evidence
-  confidence  Decimal @db.Decimal(5, 4) // 0-1
-  impactScore Decimal @db.Decimal(5, 4) // 0-1, how much this explains the change
-
-  // Supporting metrics
-  supportingMetrics Json @default("[]")
-
-  // Recommended actions
-  recommendations Json @default("[]")
-
-  rank Int // Ordered by impact
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([snapshotId])
-  @@index([category])
-  @@index([rank])
-}
-
-enum HypothesisCategory {
-  LIST_SHIFT
-  OFFER_CHANGE
-  TELEPHONY_ISSUE
-  CREATIVE_FATIGUE
-  SEASONAL_PATTERN
-  MARKET_CONDITION
-  DELIVERY_ISSUE
-  COMPETITIVE_PRESSURE
-}
-
-// =============================================================================
-// TRIGGERS & AUTOMATION
-// =============================================================================
-
-model TriggerRule {
-  id        String  @id @default(uuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id])
-
-  name        String
-  description String?
-
-  // Trigger condition
-  triggerType TriggerType
-  conditions  Json // Complex condition definition
-  // Example: {
-  //   eventType: "NEW_DISTRESS_FLAG",
-  //   distressTypes: ["PRE_FORECLOSURE"],
-  //   markets: ["market-uuid"],
-  //   priceBands: ["BAND_100_200K"]
-  // }
-
-  // Action
-  actionType   TriggerActionType
-  actionConfig Json // Action configuration
-  // Example: {
-  //   campaignId: "campaign-uuid",
-  //   stepNumber: 1,
-  //   maxLatencyHours: 72
-  // }
-
-  // Timing constraints
-  maxLatencyHours Int?
-  cooldownDays    Int? // Don't re-trigger for same property within N days
-
-  // Status
-  isActive Boolean @default(true)
-
-  // Stats
-  totalTriggered  Int       @default(0)
-  lastTriggeredAt DateTime?
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  executions TriggerExecution[]
-  tasks      Task[]
-
-  @@index([accountId])
-  @@index([triggerType])
-  @@index([isActive])
-}
-
-enum TriggerType {
-  NEW_DISTRESS_FLAG
-  DISTRESS_ESCALATION
-  PROPERTY_ENTERED_MARKET
-  DOM_THRESHOLD_EXCEEDED
-  PRICE_DROP
-  MAIL_DELIVERED
-  NO_RESPONSE_AFTER_DAYS
-  CALL_OUTCOME
-}
-
-enum TriggerActionType {
-  ADD_TO_CAMPAIGN
-  SEND_MAIL_PIECE
-  CREATE_TASK
-  SEND_WEBHOOK
-  UPDATE_SEGMENT
-}
-
-model TriggerExecution {
-  id     String      @id @default(uuid())
-  ruleId String
-  rule   TriggerRule @relation(fields: [ruleId], references: [id])
-
-  // What triggered it
-  triggerEventType String
-  triggerEventData Json
-
-  // Execution
-  status     TriggerExecutionStatus
-  executedAt DateTime               @default(now())
-
-  // Result
-  resultData   Json?
-  errorMessage String?
-
-  // Latency tracking
-  eventTimestamp DateTime
-  latencyMs      Int?
-
-  isSynthetic Boolean @default(false)
-
-  @@index([ruleId])
-  @@index([status])
-  @@index([executedAt])
-}
-
-enum TriggerExecutionStatus {
-  PENDING
-  EXECUTED
-  FAILED
-  SKIPPED
-}
-
-// =============================================================================
-// TASKS
-// =============================================================================
-
-model Task {
-  id        String  @id @default(uuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id])
-
-  // Task details
-  title       String
-  description String?
-  type        TaskType
-  priority    TaskPriority @default(MEDIUM)
-  status      TaskStatus   @default(PENDING)
-
-  // Assignment
-  assigneeId String?
-  assignee   User?   @relation(fields: [assigneeId], references: [id])
-
-  // Related entities
-  propertyId  String?
-  property    Property?  @relation(fields: [propertyId], references: [id])
-  dealId      String?
-  deal        Deal?      @relation(fields: [dealId], references: [id])
-  callEventId String?
-  callEvent   CallEvent? @relation(fields: [callEventId], references: [id])
-
-  // Source (what created this task)
-  triggerRuleId String?
-  triggerRule   TriggerRule? @relation(fields: [triggerRuleId], references: [id])
-
-  // Timing
-  dueDate     DateTime?
-  completedAt DateTime?
-
-  // Metadata
-  metadata Json @default("{}")
-
-  isSynthetic Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([accountId])
-  @@index([assigneeId])
-  @@index([status])
-  @@index([priority])
-  @@index([dueDate])
-  @@index([propertyId])
-  @@index([dealId])
-}
-
-enum TaskType {
-  FOLLOW_UP_CALL
-  SEND_MAIL
-  REVIEW_DEAL
-  PROPERTY_INSPECTION
-  NEGOTIATE_OFFER
-  COLLECT_DOCUMENTS
-  CLOSE_DEAL
-  CUSTOM
-}
-
-enum TaskPriority {
+enum RecommendationPriority {
   LOW
   MEDIUM
   HIGH
   URGENT
 }
 
-enum TaskStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  BLOCKED
+enum RecommendationStatus {
+  PENDING // New recommendation
+  VIEWED // User has seen it
+  APPLIED // User applied recommendation
+  DISMISSED // User dismissed it
+  EXPIRED // Recommendation no longer valid
 }
 
-// =============================================================================
-// AUDIT & EVENTS
-// =============================================================================
+// Feedback on recommendations to improve the AI
+model RecommendationFeedback {
+  id               String         @id @default(uuid())
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id])
 
-model AuditLog {
-  id String @id @default(uuid())
+  // Feedback type
+  feedbackType FeedbackType
 
-  accountId String?
-  userId    String?
+  // Rating (if applicable)
+  rating Int? // 1-5
 
-  entityType String
-  entityId   String
+  // Actual results (if recommendation was applied)
+  actualResponseRate Decimal? @db.Decimal(5, 4)
+  actualROI          Decimal? @db.Decimal(8, 4)
+  actualRevenue      Decimal? @db.Decimal(12, 2)
 
-  action String // CREATE, UPDATE, DELETE, etc.
+  // User comments
+  comments String?
 
-  // Change data
-  previousData Json?
-  newData      Json?
+  createdAt DateTime @default(now())
 
-  // Context
-  ipAddress String?
-  userAgent String?
-
-  timestamp DateTime @default(now())
-
-  isSynthetic Boolean @default(false)
-
-  @@index([accountId])
-  @@index([userId])
-  @@index([entityType, entityId])
-  @@index([timestamp])
+  @@index([recommendationId])
+  @@index([feedbackType])
 }
 
-model SystemEvent {
-  id String @id @default(uuid())
-
-  eventType String
-  eventData Json
-
-  // Source
-  source String // Module or service that emitted
-
-  // Correlation
-  correlationId String?
-
-  timestamp DateTime @default(now())
-
-  isSynthetic Boolean @default(false)
-
-  @@index([eventType])
-  @@index([source])
-  @@index([correlationId])
-  @@index([timestamp])
+enum FeedbackType {
+  HELPFUL
+  NOT_HELPFUL
+  INACCURATE
+  APPLIED_SUCCESS
+  APPLIED_FAILURE
 }
